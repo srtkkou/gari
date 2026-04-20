@@ -50,6 +50,8 @@ func (c *Cell) Scan(value any) error {
 		return c.scanNullString(value)
 	case kindTime:
 		return c.scanNullTime(value)
+	case kindInt64:
+		return c.scanNullInt64(value)
 	default:
 		return ErrCellKind
 	}
@@ -86,6 +88,25 @@ func (c *Cell) scanNullTime(value any) error {
 	fmt.Printf("NullTime:Valid=%t,Time=%v\n", nt.Valid, nt.Time)
 	// Store value
 	blob, err := encodeNullTime(nt)
+	if err != nil {
+		return err
+	}
+	c.value = blob
+	return nil
+}
+
+// Scan sql.NullInt64 type.
+func (c *Cell) scanNullInt64(value any) error {
+	ni := sql.NullInt64{}
+	err := ni.Scan(value)
+	if err != nil {
+		err = errs.Wrap(ErrScan, errs.WithCause(err),
+			errs.WithContext("value", value))
+		return err
+	}
+	fmt.Printf("NullInt:Valid=%t,Int64=%v\n", ni.Valid, ni.Int64)
+	// Store value
+	blob, err := encodeNullInt64(ni)
 	if err != nil {
 		return err
 	}

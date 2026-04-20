@@ -117,7 +117,7 @@ func encodeNullTime(v any) ([]byte, error) {
 }
 
 // Encode NULL or int value.
-func encodeNullInt(v any) ([]byte, error) {
+func encodeNullInt64(v any) ([]byte, error) {
 	switch tv := v.(type) {
 	case nil:
 		return msgpackNil(), nil

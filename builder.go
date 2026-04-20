@@ -32,6 +32,13 @@ func (b *Builder) AddTimeColumn(
 	return b.addColumnWithKind(name, kindTime, fn)
 }
 
+// Add int64 type column.
+func (b *Builder) AddInt64Column(
+	name string, fn func(col *Column),
+) *Builder {
+	return b.addColumnWithKind(name, kindInt64, fn)
+}
+
 // 型を指定して列を追加する。
 func (b *Builder) addColumnWithKind(
 	name string, k kind, fn func(col *Column),
@@ -42,20 +49,6 @@ func (b *Builder) addColumnWithKind(
 	b.table.addColumn(col)
 	return b
 }
-
-/*
-// 整数型の列の追加
-func (b *Builder) AddIntColumn(
-	name string, num int64, rules ...validation.Rule,
-) *Builder {
-	b.columns = append(b.columns, name)
-	b.kinds[name] = kindInt
-	b.values[name] = kindInt.encodeInt64(num)
-	// 検証ルールの追加
-	b.validations[name] = rules
-	return b
-}
-*/
 
 // テーブルを作成する。
 func (b *Builder) Build() (*Table, error) {

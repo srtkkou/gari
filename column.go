@@ -139,6 +139,21 @@ func (c *Column) SetDefaultString(str string) {
 	c.value = blob
 }
 
+// Set default int.
+func (c *Column) SetDefaultInt64(num int64) {
+	err := c.validateKind(kindInt64)
+	if err != nil {
+		c.addError(err)
+		return
+	}
+	blob, err := encodeNullInt64(num)
+	if err != nil {
+		c.addError(err)
+		return
+	}
+	c.value = blob
+}
+
 // 検証ルール群の追加
 func (c *Column) AddRules(rules ...validation.Rule) {
 	c.rules = append(c.rules, rules...)

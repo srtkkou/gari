@@ -266,7 +266,7 @@ func TestEncodeDecodeInt64(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Encode.
-			blob, err1 := encodeNullInt(test.input)
+			blob, err1 := encodeNullInt64(test.input)
 			require.Equal(t, test.encodeErr, err1)
 			if err1 == nil {
 				require.NotEmpty(t, blob)
