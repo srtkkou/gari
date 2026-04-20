@@ -70,9 +70,9 @@ func (t *Table) SelectSql() string {
 func (t *Table) Cells() []any {
 	cells := make([]any, len(t.columnNames))
 	for i, name := range t.columnNames {
-		cell := NewStringCell()
-		cell.column = t.columns[name]
-		cells[i] = &cell
+		col := t.columns[name]
+		cell := newCell(col)
+		cells[i] = cell
 	}
 	return cells
 }

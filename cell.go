@@ -20,15 +20,17 @@ type (
 )
 
 var (
-	// 型エラー
+	// Cell kind error
 	ErrCellKind = errors.New("orm.ErrCellKind")
 )
 
-func NewStringCell() Cell {
-	c := Cell{}
-	c.column = newColumn("test")
-	c.column.kind = kindString
-	return c
+// Create new Cell struct.
+func newCell(col *Column) *Cell {
+	c := Cell{
+		column: col,
+		value:  []byte{},
+	}
+	return &c
 }
 
 /*
