@@ -1,0 +1,35 @@
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task: test
+
+  fmt:
+    cmds:
+      - go fmt ./...
+
+  vet:
+    deps: [fmt]
+    cmds:
+      - go vet ./...
+
+  staticcheck:
+    deps: [vet]
+    cmds:
+      - go tool staticcheck ./...
+
+  test:
+    deps: [staticcheck]
+    cmds:
+      - go test -cover ./...
+    env:
+      APP_ENV: test
+
+  test-v:
+    deps: [staticcheck]
+    cmds:
+      - go test -cover -race -v ./...
+    env:
+      APP_ENV: test
+
