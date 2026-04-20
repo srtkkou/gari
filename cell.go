@@ -11,10 +11,11 @@ import (
 )
 
 type (
-	// セル
+	// Cell
+	// Box to store DB value.
 	Cell struct {
-		column *Column // 列
-		//		value  []byte  // 値
+		column *Column // Pointer to Column
+		value  []byte  // Encoded value
 	}
 )
 
@@ -73,5 +74,11 @@ func (c *Cell) scanNullString(value any) error {
 		return err
 	}
 	fmt.Printf("NullString:Valid=%t,String=%s\n", ns.Valid, ns.String)
+	// Store value
+	blob, err := encodeNullString(ns)
+	if err != nil {
+		return err
+	}
+	c.value = blob
 	return nil
 }
