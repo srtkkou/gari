@@ -1,7 +1,11 @@
 package gari
 
+// Column type
+type kind = string
+
 const (
-	kindBool   = "Bool"
-	kindString = "String"
-	kindTime   = "Time"
+	kindNull   = kind("Null")
+	kindBool   = kind("Bool")
+	kindString = kind("String")
+	kindTime   = kind("Time")
 )

@@ -17,7 +17,7 @@ type (
 		name         string            // テーブル列名
 		attrName     string            // 属性名
 		jsonKey      string            // JSONキー名
-		kind         string            // 型
+		kind         kind              // Type
 		size         int               // 長さ
 		allowNull    bool              // NULL型の許容
 		value        []byte            // 現在の値

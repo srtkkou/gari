@@ -34,10 +34,10 @@ func (b *Builder) AddTimeColumn(
 
 // 型を指定して列を追加する。
 func (b *Builder) addColumnWithKind(
-	name string, kind string, fn func(col *Column),
+	name string, k kind, fn func(col *Column),
 ) *Builder {
 	col := newColumn(name)
-	col.kind = kind
+	col.kind = k
 	fn(col)
 	b.table.addColumn(col)
 	return b
