@@ -12,15 +12,15 @@ import (
 )
 
 var (
-	// msgpackエンコードエラー
-	ErrMsgpackEncode = errors.New("orm.ErrMsgpackEncode")
-	// msgpackデコードエラー
-	ErrMsgpackDecode = errors.New("orm.ErrMsgpackDecode")
-	// 型の不一致
-	ErrTypeMismatch = errors.New("orm.ErrTypeMismatch")
+	// msgpack encode error.
+	ErrEncode = errors.New("orm.ErrEncode")
+	// msgpack decode error.
+	ErrDecode = errors.New("orm.ErrDecode")
+	// msgpack encode input type error.
+	ErrEncodeInputType = errors.New("orm.ErrEncodeInputType")
 )
 
-// 真偽値をエンコードする。
+// Encode NULL or bool value.
 func encodeNullBool(v any) ([]byte, error) {
 	var err error
 	var buf bytes.Buffer
@@ -30,8 +30,8 @@ func encodeNullBool(v any) ([]byte, error) {
 		return msgpackNil(), nil
 	case bool:
 		if err := enc.EncodeBool(tv); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("bool", tv))
+			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+				errs.WithContext("input", tv))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
@@ -40,18 +40,19 @@ func encodeNullBool(v any) ([]byte, error) {
 			return msgpackNil(), nil
 		}
 		if err := enc.EncodeBool(tv.Bool); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("bool", tv.Bool))
+			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+				errs.WithContext("input", tv.Bool))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
 	default:
-		err = errs.Wrap(ErrTypeMismatch, errs.WithContext("value", v))
+		err = errs.Wrap(ErrEncodeInputType,
+			errs.WithContext("input", v))
 		return []byte{}, err
 	}
 }
 
-// 文字列をエンコードする。
+// Encode NULL or string value.
 func encodeNullString(v any) ([]byte, error) {
 	var err error
 	var buf bytes.Buffer
@@ -61,8 +62,8 @@ func encodeNullString(v any) ([]byte, error) {
 		return msgpackNil(), nil
 	case string:
 		if err = enc.EncodeString(tv); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("string", tv))
+			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+				errs.WithContext("input", tv))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
@@ -71,18 +72,19 @@ func encodeNullString(v any) ([]byte, error) {
 			return msgpackNil(), nil
 		}
 		if err = enc.EncodeString(tv.String); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("string", tv.String))
+			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+				errs.WithContext("input", tv.String))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
 	default:
-		err = errs.Wrap(ErrTypeMismatch, errs.WithContext("value", v))
+		err = errs.Wrap(ErrEncodeInputType,
+			errs.WithContext("input", v))
 		return []byte{}, err
 	}
 }
 
-// 時刻をエンコードする。
+// Encode NULL or time.Time value.
 func encodeNullTime(v any) ([]byte, error) {
 	var err error
 	var buf bytes.Buffer
@@ -92,8 +94,8 @@ func encodeNullTime(v any) ([]byte, error) {
 		return msgpackNil(), nil
 	case time.Time:
 		if err = enc.EncodeTime(tv); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("time", tv))
+			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+				errs.WithContext("input", tv))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
@@ -102,86 +104,80 @@ func encodeNullTime(v any) ([]byte, error) {
 			return msgpackNil(), nil
 		}
 		if err = enc.EncodeTime(tv.Time); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("time", tv.Time))
+			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+				errs.WithContext("input", tv.Time))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
 	default:
-		err = errs.Wrap(ErrTypeMismatch, errs.WithContext("value", v))
+		err = errs.Wrap(ErrEncodeInputType,
+			errs.WithContext("input", v))
 		return []byte{}, err
 	}
 }
 
-/*
-// 整数値をエンコードする。
-func (k kind) encodeInt64(value any) string {
-	if k != kindInt {
-		return lib.JSON_NULL
-	}
-	num := int64(0)
-	switch tv := value.(type) {
-	case sql.NullInt64:
-		if !tv.Valid {
-			return lib.JSON_NULL
-		}
-		num = tv.Int64
-	case sql.NullInt32:
-		if !tv.Valid {
-			return lib.JSON_NULL
-		}
-		num = int64(tv.Int32)
+// Encode NULL or int value.
+func encodeNullInt(v any) ([]byte, error) {
+	switch tv := v.(type) {
+	case nil:
+		return msgpackNil(), nil
 	case sql.NullInt16:
 		if !tv.Valid {
-			return lib.JSON_NULL
+			return msgpackNil(), nil
 		}
-		num = int64(tv.Int16)
-	case sql.NullFloat64:
+		return encodeInt64(int64(tv.Int16))
+	case sql.NullInt32:
 		if !tv.Valid {
-			return lib.JSON_NULL
+			return msgpackNil(), nil
 		}
-		num = int64(tv.Float64)
+		return encodeInt64(int64(tv.Int32))
+	case sql.NullInt64:
+		if !tv.Valid {
+			return msgpackNil(), nil
+		}
+		return encodeInt64(tv.Int64)
 	case int:
-		num = int64(tv)
-	case int64:
-		num = tv
-	case int32:
-		num = int64(tv)
+		return encodeInt64(int64(tv))
 	case int16:
-		num = int64(tv)
-	case uint:
-		num = int64(tv)
-	case uint64:
-		num = int64(tv)
-	case uint32:
-		num = int64(tv)
-	case uint16:
-		num = int64(tv)
-	case float64:
-		num = int64(tv)
-	case float32:
-		num = int64(tv)
+		return encodeInt64(int64(tv))
+	case int32:
+		return encodeInt64(int64(tv))
+	case int64:
+		return encodeInt64(tv)
 	default:
-		return lib.JSON_NULL
+		err := errs.Wrap(ErrEncodeInputType,
+			errs.WithContext("input", v))
+		return []byte{}, err
 	}
-	return strconv.FormatInt(num, 10)
 }
-*/
 
-// 真偽値をデコードする。
+// Encode int64. (Internal use only)
+func encodeInt64(num int64) ([]byte, error) {
+	var err error
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	if err = enc.EncodeInt64(num); err != nil {
+		err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			errs.WithContext("input", num))
+		return []byte{}, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Decode to sql.NullBool value.
 func decodeNullBool(blob []byte) (sql.NullBool, error) {
 	nb := sql.NullBool{Valid: false}
-	// nil値の復元
+	// Decode NULL.
 	if slices.Equal(blob, msgpackNil()) {
 		return nb, nil
 	}
-	// 真偽値の復元
+	// Decode bool.
 	r := bytes.NewReader(blob)
 	dec := msgpack.NewDecoder(r)
 	b, err := dec.DecodeBool()
 	if err != nil {
-		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
-			errs.WithContext("bytes", blob))
+		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+			errs.WithContext("input", blob))
 		return nb, err
 	}
 	nb.Valid = true
@@ -189,20 +185,20 @@ func decodeNullBool(blob []byte) (sql.NullBool, error) {
 	return nb, nil
 }
 
-// 文字列をデコードする。
+// Decode to sql.NullString value.
 func decodeNullString(blob []byte) (sql.NullString, error) {
 	ns := sql.NullString{Valid: false}
-	// nil値の復元
+	// Decode NULL.
 	if slices.Equal(blob, msgpackNil()) {
 		return ns, nil
 	}
-	// 文字列の復元
+	// Decode string.
 	r := bytes.NewReader(blob)
 	dec := msgpack.NewDecoder(r)
 	str, err := dec.DecodeString()
 	if err != nil {
-		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
-			errs.WithContext("bytes", blob))
+		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+			errs.WithContext("input", blob))
 		return ns, err
 	}
 	ns.Valid = true
@@ -210,20 +206,20 @@ func decodeNullString(blob []byte) (sql.NullString, error) {
 	return ns, nil
 }
 
-// 時刻をデコードする。
+// Decode to sql.NullTime value.
 func decodeNullTime(blob []byte) (sql.NullTime, error) {
 	nt := sql.NullTime{Valid: false}
-	// nil値の復元
+	// Decode NULL.
 	if slices.Equal(blob, msgpackNil()) {
 		return nt, nil
 	}
-	// 時間の復元
+	// Decode time.Time.
 	r := bytes.NewReader(blob)
 	dec := msgpack.NewDecoder(r)
 	t, err := dec.DecodeTime()
 	if err != nil {
-		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
-			errs.WithContext("bytes", blob))
+		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+			errs.WithContext("input", blob))
 		return nt, err
 	}
 	nt.Valid = true
@@ -231,20 +227,28 @@ func decodeNullTime(blob []byte) (sql.NullTime, error) {
 	return nt, nil
 }
 
-/*
-// 整数値をデコードする。
-func (k kind) decodeInt64(str string) int64 {
-	if k == kindInt && str != lib.JSON_NULL {
-		num, err := strconv.ParseInt(str, 10, 64)
-		if err == nil {
-			return num
-		}
+// Decode to sql.NullInt64 value.
+func decodeNullInt64(blob []byte) (sql.NullInt64, error) {
+	ni := sql.NullInt64{Valid: false}
+	// Decode NULL.
+	if slices.Equal(blob, msgpackNil()) {
+		return ni, nil
 	}
-	return 0
+	// Decode int64.
+	r := bytes.NewReader(blob)
+	dec := msgpack.NewDecoder(r)
+	num, err := dec.DecodeInt64()
+	if err != nil {
+		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+			errs.WithContext("input", blob))
+		return ni, err
+	}
+	ni.Valid = true
+	ni.Int64 = num
+	return ni, nil
 }
-*/
 
-// msgpack形式のnil
+// NULL in msgpack format.
 func msgpackNil() []byte {
 	return []byte{0xc0}
 }

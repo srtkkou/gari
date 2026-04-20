@@ -8,4 +8,5 @@ const (
 	kindBool   = kind("Bool")
 	kindString = kind("String")
 	kindTime   = kind("Time")
+	kindInt    = kind("Int")
 )
