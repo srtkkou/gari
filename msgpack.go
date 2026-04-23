@@ -24,11 +24,11 @@ const (
 
 var (
 	// msgpack encode error.
-	ErrEncode = errors.New("orm.ErrEncode")
+	ErrMsgpackEncode = errors.New("orm.ErrMsgpackEncode")
 	// msgpack decode error.
-	ErrDecode = errors.New("orm.ErrDecode")
+	ErrMsgpackDecode = errors.New("orm.ErrMsgpackDecode")
 	// msgpack encode input type error.
-	ErrEncodeInputType = errors.New("orm.ErrEncodeInputType")
+	ErrMsgpackInputType = errors.New("orm.ErrMsgpackInputType")
 	// msgpack oversized array error.
 	ErrMsgpackArraySize = errors.New("orm.ErrMsgpackArraySize")
 	// msgpack oversized map error.
@@ -45,7 +45,7 @@ func encodeNullBool(v any) ([]byte, error) {
 		return msgpackNil(), nil
 	case bool:
 		if err := enc.EncodeBool(tv); err != nil {
-			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 				errs.WithContext("input", tv))
 			return []byte{}, err
 		}
@@ -55,13 +55,13 @@ func encodeNullBool(v any) ([]byte, error) {
 			return msgpackNil(), nil
 		}
 		if err := enc.EncodeBool(tv.Bool); err != nil {
-			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 				errs.WithContext("input", tv.Bool))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
 	default:
-		err = errs.Wrap(ErrEncodeInputType,
+		err = errs.Wrap(ErrMsgpackInputType,
 			errs.WithContext("input", v))
 		return []byte{}, err
 	}
@@ -77,7 +77,7 @@ func encodeNullString(v any) ([]byte, error) {
 		return msgpackNil(), nil
 	case string:
 		if err = enc.EncodeString(tv); err != nil {
-			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 				errs.WithContext("input", tv))
 			return []byte{}, err
 		}
@@ -87,13 +87,13 @@ func encodeNullString(v any) ([]byte, error) {
 			return msgpackNil(), nil
 		}
 		if err = enc.EncodeString(tv.String); err != nil {
-			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 				errs.WithContext("input", tv.String))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
 	default:
-		err = errs.Wrap(ErrEncodeInputType,
+		err = errs.Wrap(ErrMsgpackInputType,
 			errs.WithContext("input", v))
 		return []byte{}, err
 	}
@@ -109,7 +109,7 @@ func encodeNullTime(v any) ([]byte, error) {
 		return msgpackNil(), nil
 	case time.Time:
 		if err = enc.EncodeTime(tv); err != nil {
-			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 				errs.WithContext("input", tv))
 			return []byte{}, err
 		}
@@ -119,13 +119,13 @@ func encodeNullTime(v any) ([]byte, error) {
 			return msgpackNil(), nil
 		}
 		if err = enc.EncodeTime(tv.Time); err != nil {
-			err = errs.Wrap(ErrEncode, errs.WithCause(err),
+			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 				errs.WithContext("input", tv.Time))
 			return []byte{}, err
 		}
 		return buf.Bytes(), nil
 	default:
-		err = errs.Wrap(ErrEncodeInputType,
+		err = errs.Wrap(ErrMsgpackInputType,
 			errs.WithContext("input", v))
 		return []byte{}, err
 	}
@@ -160,7 +160,7 @@ func encodeNullInt64(v any) ([]byte, error) {
 	case int64:
 		return encodeInt64(tv)
 	default:
-		err := errs.Wrap(ErrEncodeInputType,
+		err := errs.Wrap(ErrMsgpackInputType,
 			errs.WithContext("input", v))
 		return []byte{}, err
 	}
@@ -172,7 +172,7 @@ func encodeInt64(num int64) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := msgpack.NewEncoder(&buf)
 	if err = enc.EncodeInt64(num); err != nil {
-		err = errs.Wrap(ErrEncode, errs.WithCause(err),
+		err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
 			errs.WithContext("input", num))
 		return []byte{}, err
 	}
@@ -191,7 +191,7 @@ func decodeNullBool(blob []byte) (sql.NullBool, error) {
 	dec := msgpack.NewDecoder(r)
 	b, err := dec.DecodeBool()
 	if err != nil {
-		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
 			errs.WithContext("input", blob))
 		return nb, err
 	}
@@ -212,7 +212,7 @@ func decodeNullString(blob []byte) (sql.NullString, error) {
 	dec := msgpack.NewDecoder(r)
 	str, err := dec.DecodeString()
 	if err != nil {
-		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
 			errs.WithContext("input", blob))
 		return ns, err
 	}
@@ -233,7 +233,7 @@ func decodeNullTime(blob []byte) (sql.NullTime, error) {
 	dec := msgpack.NewDecoder(r)
 	t, err := dec.DecodeTime()
 	if err != nil {
-		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
 			errs.WithContext("input", blob))
 		return nt, err
 	}
@@ -254,7 +254,7 @@ func decodeNullInt64(blob []byte) (sql.NullInt64, error) {
 	dec := msgpack.NewDecoder(r)
 	num, err := dec.DecodeInt64()
 	if err != nil {
-		err = errs.Wrap(ErrDecode, errs.WithCause(err),
+		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
 			errs.WithContext("input", blob))
 		return ni, err
 	}
