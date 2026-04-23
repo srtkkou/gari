@@ -10,6 +10,7 @@ tool (
 require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/goark/errs v1.3.2
+	github.com/izinin/json2msgpack v0.0.0-20171109104254-58b3991b6103
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/stretchr/testify v1.11.1
 	github.com/vmihailenco/msgpack/v5 v5.4.1
@@ -113,6 +114,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/u-root/u-root v0.15.1-0.20251208185023-2f8c7e763cf8 // indirect
 	github.com/u-root/uio v0.0.0-20240224005618-d2acac8f3701 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
