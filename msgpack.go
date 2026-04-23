@@ -3,12 +3,23 @@ package gari
 import (
 	"bytes"
 	"database/sql"
+	"encoding/binary"
 	"errors"
+	"math"
 	"slices"
 	"time"
 
 	"github.com/goark/errs"
 	"github.com/vmihailenco/msgpack/v5"
+)
+
+const (
+	fixArrayByte = byte(0b1001_0000)
+	array16Byte  = byte(0xdc)
+	array32Byte  = byte(0xdd)
+	fixMapByte   = byte(0b1000_0000)
+	map16Byte    = byte(0xde)
+	map32Byte    = byte(0xdf)
 )
 
 var (
@@ -18,6 +29,10 @@ var (
 	ErrDecode = errors.New("orm.ErrDecode")
 	// msgpack encode input type error.
 	ErrEncodeInputType = errors.New("orm.ErrEncodeInputType")
+	// msgpack oversized array error.
+	ErrMsgpackArraySize = errors.New("orm.ErrMsgpackArraySize")
+	// msgpack oversized map error.
+	ErrMsgpackMapSize = errors.New("orm.ErrMsgpackMapSize")
 )
 
 // Encode NULL or bool value.
@@ -251,4 +266,44 @@ func decodeNullInt64(blob []byte) (sql.NullInt64, error) {
 // NULL in msgpack format.
 func msgpackNil() []byte {
 	return []byte{0xc0}
+}
+
+// Array header.
+func msgpackArrayHeader(size int) ([]byte, error) {
+	var b bytes.Buffer
+	if size <= 15 { // fixarray
+		headByte := fixArrayByte | byte(size)
+		b.WriteByte(headByte)
+	} else if size <= math.MaxUint16 { // array16
+		b.WriteByte(array16Byte)
+		binary.Write(&b, binary.BigEndian, uint16(size))
+	} else if size <= math.MaxUint32 { // array32
+		b.WriteByte(array32Byte)
+		binary.Write(&b, binary.BigEndian, uint32(size))
+	} else {
+		err := errs.Wrap(ErrMsgpackArraySize,
+			errs.WithContext("size", size))
+		return []byte{}, err
+	}
+	return b.Bytes(), nil
+}
+
+// Map header.
+func msgpackMapHeader(size int) ([]byte, error) {
+	var b bytes.Buffer
+	if size <= 15 { // fixmap
+		headByte := fixMapByte | byte(size)
+		b.WriteByte(headByte)
+	} else if size <= math.MaxUint16 { // map16
+		b.WriteByte(map16Byte)
+		binary.Write(&b, binary.BigEndian, uint16(size))
+	} else if size <= math.MaxUint32 { // map32
+		b.WriteByte(map32Byte)
+		binary.Write(&b, binary.BigEndian, uint32(size))
+	} else {
+		err := errs.Wrap(ErrMsgpackMapSize,
+			errs.WithContext("size", size))
+		return []byte{}, err
+	}
+	return b.Bytes(), nil
 }
