@@ -43,6 +43,16 @@ func (c Cell) String() string {
 	return b.String()
 }
 
+// Attr name and value.
+func (c Cell) MsgpackBytes() ([]byte, error) {
+	blob, err := encodeNullString(c.column.attrName)
+	if err != nil {
+		return []byte{}, err
+	}
+	blob = append(blob, c.value...)
+	return blob, nil
+}
+
 // Scan value into Cell struct.
 func (c *Cell) Scan(value any) error {
 	switch c.column.kind {
