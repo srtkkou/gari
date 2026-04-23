@@ -1,34 +1,20 @@
 package gari
 
-import (
-	"strings"
-)
+import ()
 
 type (
-	// テーブル
+	// Table
 	Table struct {
-		gari        *Gari              // 設定への参照
-		name        string             // 名前
-		columnNames []string           // 列名群
-		attrNames   []string           // 属性名群
-		jsonKeys    []string           // JSONキー名群
-		columns     map[string]*Column // 列情報マップ
+		gari        *Gari              // Pointer to gari config.
+		name        string             // Table name.
+		columnNames []string           // Column names.
+		attrNames   []string           // Attribute names.
+		jsonKeys    []string           // JSON key names.
+		columns     map[string]*Column // Map of columns.
 	}
 )
 
-/*
-var (
-	// INSERT文作成エラー
-	ErrTableInsertQuery = errors.New("orm.ErrTableInsertQuery")
-	// UPDATE文作成エラー
-	ErrTableUpdateQuery = errors.New("orm.ErrTableUpdateQuery")
-
-	// SQLビルダー
-	sqlBuilder = sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
-)
-*/
-
-// 空テーブルの作成
+// Create new table.
 func newTable(g *Gari, name string) *Table {
 	return &Table{
 		gari:        g,
@@ -40,41 +26,14 @@ func newTable(g *Gari, name string) *Table {
 	}
 }
 
-// テーブル名
+// Table name.
 func (t *Table) Name() string {
 	return t.name
 }
 
-func (t *Table) SelectSql() string {
-	var b strings.Builder
-	b.WriteString("SELECT ")
-	for i, name := range t.columnNames {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(t.gari.columnQuote)
-		b.WriteString(t.name)
-		b.WriteString(t.gari.columnQuote)
-		b.WriteString(".")
-		b.WriteString(t.gari.columnQuote)
-		b.WriteString(name)
-		b.WriteString(t.gari.columnQuote)
-	}
-	b.WriteString(" FROM ")
-	b.WriteString(t.gari.columnQuote)
-	b.WriteString(t.name)
-	b.WriteString(t.gari.columnQuote)
-	return b.String()
-}
-
-func (t *Table) Cells() []any {
-	cells := make([]any, len(t.columnNames))
-	for i, name := range t.columnNames {
-		col := t.columns[name]
-		cell := newCell(col)
-		cells[i] = cell
-	}
-	return cells
+// Build SELECT statement.
+func (t *Table) Select(ptr any) *selectBuilder {
+	return newSelectBuilder(t, ptr)
 }
 
 /*
