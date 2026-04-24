@@ -1,6 +1,10 @@
 package gari
 
-import ()
+import (
+	"context"
+	"database/sql"
+	"fmt"
+)
 
 type (
 	// Table
@@ -34,6 +38,19 @@ func (t *Table) Name() string {
 // Build SELECT statement.
 func (t *Table) Select(ptr any) *selectBuilder {
 	return newSelectBuilder(t, ptr)
+}
+
+// Execute DDL SQL to migrate table.
+func (t *Table) Migrate(ctx context.Context, db *sql.DB) error {
+	// Build DDL SQL.
+	stmt := newDdlBuilder(t).sql()
+	fmt.Printf("migrage=%s\n", stmt)
+	// Execute query.
+	_, err := db.ExecContext(ctx, stmt)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 /*

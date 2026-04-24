@@ -17,7 +17,7 @@ type (
 )
 
 func TestSqlmock(t *testing.T) {
-	// Define objects table.
+	// Define samples table.
 	gari, err := New()
 	require.NoError(t, err)
 	sampleTable := gari.Table("samples").
@@ -33,14 +33,20 @@ func TestSqlmock(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
-	// Add expectation.
+	// Add DDL expectation.
+	mock.ExpectExec("CREATE TABLE IF NOT EXISTS samples(.*)").
+		WillReturnResult(sqlmock.NewResult(1, 2))
+	// Add SELECT expectation.
 	rows := mock.NewRows([]string{"num", "text"}).
 		AddRow(111, "str1").
 		AddRow(222, "str2")
 	mock.ExpectQuery(`SELECT .* FROM "samples" .*`).
 		WillReturnRows(rows)
-	// SELECT
+	// Migrate.
 	ctx := context.Background()
+	err = sampleTable.Migrate(ctx, db)
+	require.NoError(t, err)
+	// SELECT
 	samples := make([]sampleStruct, 0)
 	err = sampleTable.Select(&samples).OrderAsc("num").All(ctx, db)
 	require.NoError(t, err)
