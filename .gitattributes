@@ -1,0 +1,12 @@
+# 全てのtext属性ファイルの改行コードをLFで統一する。
+* text=auto eol=lf
+
+# バイナリファイルは変換しない。
+*.gif binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+
+# 例外的にCRLFを使う。
+*.bat
+*.ps1
