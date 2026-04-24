@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSetGetBool(t *testing.T) {
+func TestColumnDefaultBool(t *testing.T) {
 	tests := []struct {
 		name  string
 		input bool
@@ -22,10 +22,15 @@ func TestSetGetBool(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		col := newColumn("bool_column")
-		col.kind = kindBool
+		gari, err := New()
+		require.NoError(t, err)
 		t.Run(test.name, func(t *testing.T) {
-			col.SetDefaultBool(test.input)
+			table, err := gari.Table("test").
+				AddBoolColumn("is_ok",
+					DefaultBool(test.input)).
+				Define()
+			require.NoError(t, err)
+			col := table.columns["is_ok"]
 			require.NotEmpty(t, col.value)
 		})
 	}

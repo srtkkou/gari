@@ -11,30 +11,30 @@ type (
 
 // Add bool type column.
 func (b *TableBuilder) AddBoolColumn(
-	name string, fn func(col *Column),
+	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindBool, fn)
+	return b.addColumnWithKind(name, kindBool, opts)
 }
 
 // Add string type column.
 func (b *TableBuilder) AddStringColumn(
-	name string, fn func(col *Column),
+	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindString, fn)
+	return b.addColumnWithKind(name, kindString, opts)
 }
 
 // Add time type column.
 func (b *TableBuilder) AddTimeColumn(
-	name string, fn func(col *Column),
+	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindTime, fn)
+	return b.addColumnWithKind(name, kindTime, opts)
 }
 
 // Add int64 type column.
 func (b *TableBuilder) AddInt64Column(
-	name string, fn func(col *Column),
+	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindInt64, fn)
+	return b.addColumnWithKind(name, kindInt64, opts)
 }
 
 // Define table.
@@ -59,11 +59,13 @@ func (b *TableBuilder) MustDefine() *Table {
 
 // Add column with specified type.
 func (b *TableBuilder) addColumnWithKind(
-	name string, k kind, fn func(col *Column),
+	name string, k kind, opts []ColumnOption,
 ) *TableBuilder {
 	col := newColumn(name)
 	col.kind = k
-	fn(col)
+	for _, opt := range opts {
+		opt(col)
+	}
 	b.table.addColumn(col)
 	return b
 }

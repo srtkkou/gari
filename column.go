@@ -26,6 +26,8 @@ type (
 		err          error             // エラー
 		//		dbKind       sql.ColumnType    // DB上の型
 	}
+	// Option of column.
+	ColumnOption func(*Column)
 )
 
 var (
@@ -45,7 +47,7 @@ func newColumn(name string) *Column {
 		jsonKey:      snakeToLowerCamelCase(name),
 		kind:         "",
 		size:         -1,
-		allowNull:    false,
+		allowNull:    true,
 		value:        []byte{},
 		defaultValue: []byte{},
 		rules:        make([]validation.Rule, 0),
@@ -71,9 +73,11 @@ func (c *Column) String() string {
 	return b.String()
 }
 
-// 属性名の設定
-func (c *Column) SetAttrName(name string) {
-	c.attrName = name
+// Set field name.
+func FieldName(name string) ColumnOption {
+	return func(c *Column) {
+		c.attrName = name
+	}
 }
 
 // JSONキー名
@@ -81,77 +85,90 @@ func (c *Column) SetJsonKey(key string) {
 	c.jsonKey = key
 }
 
-// 長さの設定
-func (c *Column) SetSize(size int) {
-	c.size = size
+// Set size of column.
+func Size(size int) ColumnOption {
+	return func(c *Column) {
+		c.size = size
+	}
 }
 
-// NULL値を許容するか？
-func (c *Column) AllowNull(b bool) {
-	c.allowNull = b
+// Disallow NULL for column.
+func NotNull() ColumnOption {
+	return func(c *Column) {
+		c.allowNull = false
+	}
 }
 
-// 初期Null値の設定
-func (c *Column) SetDefaultNull() {
-	if !c.allowNull {
-		err := errs.Wrap(ErrDefaultValueNull,
-			errs.WithContext("columnName", c.name),
-			errs.WithContext("allowNull", c.allowNull))
-		c.addError(err)
-		return
+// Set default value NULL.
+func DefaultNull() ColumnOption {
+	return func(c *Column) {
+		if !c.allowNull {
+			err := errs.Wrap(ErrDefaultValueNull,
+				errs.WithContext("columnName", c.name),
+				errs.WithContext("allowNull", c.allowNull))
+			c.addError(err)
+			return
+		}
+		c.value = msgpackNil()
 	}
-	c.value = msgpackNil()
 }
 
-// 初期真偽値の設定
-func (c *Column) SetDefaultBool(b bool) {
-	err := c.validateKind(kindBool)
-	if err != nil {
-		c.addError(err)
-		return
+// Set default bool value.
+func DefaultBool(b bool) ColumnOption {
+	return func(c *Column) {
+		err := c.validateKind(kindBool)
+		if err != nil {
+			c.addError(err)
+			return
+		}
+		blob, err := encodeNullBool(b)
+		if err != nil {
+			c.addError(err)
+			return
+		}
+		c.value = blob
 	}
-	blob, err := encodeNullBool(b)
-	if err != nil {
-		c.addError(err)
-		return
-	}
-	c.value = blob
 }
 
-// 初期文字列の設定
-func (c *Column) SetDefaultString(str string) {
-	err := c.validateKind(kindString)
-	if err != nil {
-		c.addError(err)
-		return
+// Set default string value.
+func DefaultString(str string) ColumnOption {
+	return func(c *Column) {
+		err := c.validateKind(kindString)
+		if err != nil {
+			c.addError(err)
+			return
+		}
+		if c.size < len(str) {
+			err = errs.Wrap(ErrDefaultValueSize,
+				errs.WithContext("input", str),
+				errs.WithContext("size", c.size))
+			c.addError(err)
+			return
+		}
+		blob, err := encodeNullString(str)
+		if err != nil {
+			c.addError(err)
+			return
+		}
+		c.value = blob
 	}
-	if c.size < len(str) {
-		err = errs.Wrap(ErrDefaultValueSize, errs.WithContext("string", str),
-			errs.WithContext("size", c.size))
-		c.addError(err)
-		return
-	}
-	blob, err := encodeNullString(str)
-	if err != nil {
-		c.addError(err)
-		return
-	}
-	c.value = blob
 }
 
-// Set default int.
-func (c *Column) SetDefaultInt64(num int64) {
-	err := c.validateKind(kindInt64)
-	if err != nil {
-		c.addError(err)
-		return
+// Set default int value.
+func DefaultInt64(num int64) ColumnOption {
+	return func(c *Column) {
+		err := c.validateKind(kindInt64)
+		if err != nil {
+			c.addError(err)
+			return
+		}
+		blob, err := encodeNullInt64(num)
+		if err != nil {
+			c.addError(err)
+			return
+		}
+		c.value = blob
 	}
-	blob, err := encodeNullInt64(num)
-	if err != nil {
-		c.addError(err)
-		return
-	}
-	c.value = blob
 }
 
 // 検証ルール群の追加

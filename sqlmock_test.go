@@ -20,22 +20,20 @@ func TestSqlmock(t *testing.T) {
 	// Define samples table.
 	gari, err := New()
 	require.NoError(t, err)
-	sampleTable := gari.Table("samples").
-		AddInt64Column("num", func(col *Column) {
-			col.SetDefaultInt64(0)
-		}).
-		AddStringColumn("text", func(col *Column) {
-			col.SetSize(255)
-			col.SetDefaultString("defaultString")
-		}).
-		MustDefine()
+	table, err := gari.Table("samples").
+		AddInt64Column("num",
+			NotNull(), DefaultInt64(0)).
+		AddStringColumn("text",
+			NotNull(), Size(255), DefaultString("default")).
+		Define()
+	require.NoError(t, err)
 	// Open sqlmock.
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
 	// Add DDL expectation.
 	mock.ExpectExec("CREATE TABLE IF NOT EXISTS samples(.*)").
-		WillReturnResult(sqlmock.NewResult(1, 2))
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	// Add SELECT expectation.
 	rows := mock.NewRows([]string{"num", "text"}).
 		AddRow(111, "str1").
@@ -44,11 +42,11 @@ func TestSqlmock(t *testing.T) {
 		WillReturnRows(rows)
 	// Migrate.
 	ctx := context.Background()
-	err = sampleTable.Migrate(ctx, db)
+	err = table.Migrate(ctx, db)
 	require.NoError(t, err)
 	// SELECT
 	samples := make([]sampleStruct, 0)
-	err = sampleTable.Select(&samples).OrderAsc("num").All(ctx, db)
+	err = table.Select(&samples).OrderAsc("num").All(ctx, db)
 	require.NoError(t, err)
 	// Check result.
 	require.Equal(t, 2, len(samples))
