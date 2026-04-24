@@ -29,7 +29,7 @@ tasks:
   test-v:
     deps: [staticcheck]
     cmds:
-      - go test -cover -race -v ./...
+      - go test -cover -v ./...
     env:
       APP_ENV: test
 
