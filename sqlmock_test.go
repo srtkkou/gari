@@ -20,7 +20,7 @@ func TestSqlmock(t *testing.T) {
 	// Define objects table.
 	gari, err := New()
 	require.NoError(t, err)
-	sampleTable, err := gari.DefineTable("samples").
+	sampleTable := gari.Table("samples").
 		AddInt64Column("num", func(col *Column) {
 			col.SetDefaultInt64(0)
 		}).
@@ -28,8 +28,7 @@ func TestSqlmock(t *testing.T) {
 			col.SetSize(255)
 			col.SetDefaultString("defaultString")
 		}).
-		Build()
-	require.NoError(t, err)
+		MustDefine()
 	// Open sqlmock.
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)

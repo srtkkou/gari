@@ -21,7 +21,7 @@ var (
 	ErrOption = errors.New("gari.ErrOption")
 )
 
-// 初期化
+// Initialize.
 func New(fns ...OptionFunc) (*Gari, error) {
 	g := Gari{
 		stringQuote: `'`,
@@ -36,9 +36,9 @@ func New(fns ...OptionFunc) (*Gari, error) {
 	return &g, nil
 }
 
-// テーブル定義の開始宣言
-func (g *Gari) DefineTable(name string) *Builder {
-	b := Builder{
+// Start table builder sequence.
+func (g *Gari) Table(name string) *TableBuilder {
+	b := TableBuilder{
 		table: newTable(g, name),
 	}
 	return &b

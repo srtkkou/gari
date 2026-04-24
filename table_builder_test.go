@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuilder(t *testing.T) {
+func TestTableBuilder(t *testing.T) {
 	g, _ := New()
-	table, err := g.DefineTable("users").
+	table, err := g.Table("users").
 		AddStringColumn("xid", func(col *Column) {
 			col.SetSize(32)
 			col.SetDefaultString("")
@@ -20,7 +20,7 @@ func TestBuilder(t *testing.T) {
 		AddBoolColumn("ok", func(col *Column) {
 			col.SetDefaultBool(false)
 		}).
-		Build()
+		Define()
 	require.NoError(t, err)
 	require.NotNil(t, table)
 }
