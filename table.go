@@ -43,10 +43,10 @@ func (t *Table) Select(ptr any) *selectBuilder {
 // Execute DDL SQL to migrate table.
 func (t *Table) Migrate(ctx context.Context, db *sql.DB) error {
 	// Build DDL SQL.
-	stmt := newDdlBuilder(t).sql()
-	fmt.Printf("migrage=%s\n", stmt)
+	stmt, err := newDdlBuilder(t).sql()
+	fmt.Printf("MIGRATE(err=%v)\nSQL=%s\n", err, stmt)
 	// Execute query.
-	_, err := db.ExecContext(ctx, stmt)
+	_, err = db.ExecContext(ctx, stmt)
 	if err != nil {
 		return err
 	}

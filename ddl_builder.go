@@ -1,6 +1,7 @@
 package gari
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -19,7 +20,7 @@ func newDdlBuilder(t *Table) *ddlBuilder {
 	return &db
 }
 
-func (db *ddlBuilder) sql() string {
+func (db *ddlBuilder) sql() (string, error) {
 	strQuote := db.table.gari.stringQuote
 	var b strings.Builder
 	b.WriteString("CREATE TABLE ")
@@ -48,33 +49,36 @@ func (db *ddlBuilder) sql() string {
 			b.WriteString(" NOT NULL")
 		}
 		// Default
+		fmt.Printf("ColKind=%s default=%#x\n", col.kind, col.defaultValue)
 		if len(col.defaultValue) > 0 {
 			switch col.kind {
 			case kindString:
 				ns, err := decodeNullString(col.defaultValue)
-				if err == nil {
-					if ns.Valid {
-						b.WriteString(" DEFAULT ")
-						b.WriteString(strQuote)
-						b.WriteString(ns.String)
-						b.WriteString(strQuote)
-					} else {
-						b.WriteString(" DEFAULT NULL")
-					}
+				if err != nil {
+					return "", err
+				}
+				if ns.Valid {
+					b.WriteString(" DEFAULT ")
+					b.WriteString(strQuote)
+					b.WriteString(ns.String)
+					b.WriteString(strQuote)
+				} else {
+					b.WriteString(" DEFAULT NULL")
 				}
 			case kindInt64:
 				ni, err := decodeNullInt64(col.defaultValue)
-				if err == nil {
-					if ni.Valid {
-						b.WriteString(" DEFAULT ")
-						b.WriteString(strconv.FormatInt(ni.Int64, 10))
-					} else {
-						b.WriteString(" DEFAULT NULL")
-					}
+				if err != nil {
+					return "", err
+				}
+				if ni.Valid {
+					b.WriteString(" DEFAULT ")
+					b.WriteString(strconv.FormatInt(ni.Int64, 10))
+				} else {
+					b.WriteString(" DEFAULT NULL")
 				}
 			}
 		}
 	}
 	b.WriteString(");")
-	return b.String()
+	return b.String(), nil
 }
