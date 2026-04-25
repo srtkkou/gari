@@ -12,7 +12,7 @@ type (
 		gari        *Gari              // Pointer to gari config.
 		name        string             // Table name.
 		columnNames []string           // Column names.
-		attrNames   []string           // Attribute names.
+		fieldNames  []string           // Attribute names.
 		jsonKeys    []string           // JSON key names.
 		columns     map[string]*Column // Map of columns.
 	}
@@ -24,7 +24,7 @@ func newTable(g *Gari, name string) *Table {
 		gari:        g,
 		name:        name,
 		columnNames: make([]string, 0),
-		attrNames:   make([]string, 0),
+		fieldNames:  make([]string, 0),
 		jsonKeys:    make([]string, 0),
 		columns:     make(map[string]*Column, 0),
 	}
@@ -81,12 +81,10 @@ func (t *Table) LoadTestdata(xid string) error {
 func (t *Table) addColumn(col *Column) {
 	// 列名・属性名・JSONキー名の追加
 	t.columnNames = append(t.columnNames, col.name)
-	t.attrNames = append(t.attrNames, col.attrName)
-	t.jsonKeys = append(t.jsonKeys, col.jsonKey)
+	t.fieldNames = append(t.fieldNames, col.fieldName)
 	// マップに追加する。
 	t.columns[col.name] = col
-	t.columns[col.attrName] = col
-	t.columns[col.jsonKey] = col
+	t.columns[col.fieldName] = col
 	// テーブルへのポインタの追加
 	col.table = t
 }

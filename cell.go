@@ -45,7 +45,7 @@ func (c Cell) String() string {
 
 // Attr name and value.
 func (c Cell) MsgpackBytes() ([]byte, error) {
-	blob, err := encodeNullString(c.column.attrName)
+	blob, err := encodeNullString(c.column.fieldName)
 	if err != nil {
 		return []byte{}, err
 	}

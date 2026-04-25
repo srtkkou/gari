@@ -13,15 +13,13 @@ import (
 type (
 	// 列
 	Column struct {
-		table        *Table            // テーブル
-		name         string            // テーブル列名
-		attrName     string            // 属性名
-		jsonKey      string            // JSONキー名
-		kind         kind              // Type
-		size         int               // 長さ
-		allowNull    bool              // NULL型の許容
-		value        []byte            // 現在の値
-		defaultValue []byte            // 既定値
+		table        *Table            // Pointer to table.
+		name         string            // Table column name.
+		fieldName    string            // Field name in struct.
+		kind         kind              // Column type.
+		size         int               // Size of column type.
+		notNull      bool              // Flag to set NOT NULL.
+		defaultValue []byte            // Default value of column.
 		rules        []validation.Rule // 検証ルール
 		err          error             // エラー
 		//		dbKind       sql.ColumnType    // DB上の型
@@ -43,12 +41,10 @@ var (
 func newColumn(name string) *Column {
 	return &Column{
 		name:         name,
-		attrName:     snakeToUpperCamelCase(name),
-		jsonKey:      snakeToLowerCamelCase(name),
+		fieldName:    snakeToUpperCamelCase(name),
 		kind:         "",
-		size:         -1,
-		allowNull:    true,
-		value:        []byte{},
+		size:         255,
+		notNull:      false,
 		defaultValue: []byte{},
 		rules:        make([]validation.Rule, 0),
 	}
@@ -59,16 +55,14 @@ func (c *Column) String() string {
 	var b strings.Builder
 	b.WriteString(`{"column":"`)
 	b.WriteString(c.name)
-	b.WriteString(`","attrName":"`)
-	b.WriteString(c.attrName)
-	b.WriteString(`","jsonKey":"`)
-	b.WriteString(c.jsonKey)
+	b.WriteString(`","fieldName":"`)
+	b.WriteString(c.fieldName)
 	b.WriteString(`","kind":"`)
 	b.WriteString(c.kind)
 	b.WriteString(`","size":`)
 	b.WriteString(strconv.Itoa(c.size))
-	b.WriteString(`,"allowNull":`)
-	b.WriteString(strconv.FormatBool(c.allowNull))
+	b.WriteString(`,"notNull":`)
+	b.WriteString(strconv.FormatBool(c.notNull))
 	b.WriteString(`}`)
 	return b.String()
 }
@@ -76,13 +70,8 @@ func (c *Column) String() string {
 // Set field name.
 func FieldName(name string) ColumnOption {
 	return func(c *Column) {
-		c.attrName = name
+		c.fieldName = name
 	}
-}
-
-// JSONキー名
-func (c *Column) SetJsonKey(key string) {
-	c.jsonKey = key
 }
 
 // Set size of column.
@@ -92,24 +81,24 @@ func Size(size int) ColumnOption {
 	}
 }
 
-// Disallow NULL for column.
+// Set NOT NULL for column.
 func NotNull() ColumnOption {
 	return func(c *Column) {
-		c.allowNull = false
+		c.notNull = true
 	}
 }
 
 // Set default value NULL.
 func DefaultNull() ColumnOption {
 	return func(c *Column) {
-		if !c.allowNull {
+		if !c.notNull {
 			err := errs.Wrap(ErrDefaultValueNull,
 				errs.WithContext("columnName", c.name),
-				errs.WithContext("allowNull", c.allowNull))
+				errs.WithContext("notNull", c.notNull))
 			c.addError(err)
 			return
 		}
-		c.value = msgpackNil()
+		c.defaultValue = msgpackNil()
 	}
 }
 
@@ -126,7 +115,7 @@ func DefaultBool(b bool) ColumnOption {
 			c.addError(err)
 			return
 		}
-		c.value = blob
+		c.defaultValue = blob
 	}
 }
 
@@ -150,7 +139,7 @@ func DefaultString(str string) ColumnOption {
 			c.addError(err)
 			return
 		}
-		c.value = blob
+		c.defaultValue = blob
 	}
 }
 
@@ -167,7 +156,7 @@ func DefaultInt64(num int64) ColumnOption {
 			c.addError(err)
 			return
 		}
-		c.value = blob
+		c.defaultValue = blob
 	}
 }
 
@@ -186,7 +175,7 @@ func (c *Column) validateKind(kinds ...string) error {
 	return nil
 }
 
-// エラーの追加
+// Add error to column.
 func (c *Column) addError(err error) {
 	c.err = errors.Join(c.err, err)
 }

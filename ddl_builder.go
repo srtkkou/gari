@@ -45,7 +45,7 @@ func (db *ddlBuilder) sql() (string, error) {
 			b.WriteString("INTEGER")
 		}
 		// Null
-		if !col.allowNull {
+		if col.notNull {
 			b.WriteString(" NOT NULL")
 		}
 		// Default
