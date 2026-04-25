@@ -1,9 +1,10 @@
 package gari
 
 import (
-	"fmt"
-	"strconv"
+	"errors"
 	"strings"
+
+	"github.com/goark/errs"
 )
 
 type (
@@ -13,6 +14,11 @@ type (
 	}
 )
 
+var (
+	ErrDDLBuild = errors.New("gari.ErrDDLBuild")
+)
+
+// Create new DDL builder instance.
 func newDdlBuilder(t *Table) *ddlBuilder {
 	db := ddlBuilder{
 		table: t,
@@ -20,65 +26,28 @@ func newDdlBuilder(t *Table) *ddlBuilder {
 	return &db
 }
 
-func (db *ddlBuilder) sql() (string, error) {
-	strQuote := db.table.gari.stringQuote
-	var b strings.Builder
-	b.WriteString("CREATE TABLE ")
-	b.WriteString("IF NOT EXISTS ")
-	b.WriteString(db.table.Name())
-	b.WriteString("(")
-	for i, name := range db.table.columnNames {
-		if i > 0 {
-			b.WriteString(", ")
+// Build DDL SQL.
+func (b *ddlBuilder) build() (string, error) {
+	tokens := make([]string, 0)
+	tokens = append(tokens, "CREATE TABLE")
+	tokens = append(tokens, "IF NOT EXISTS")
+	tokens = append(tokens, b.table.name+"(")
+	for i, name := range b.table.columnNames {
+		// Add column DDL token.
+		col := b.table.columns[name]
+		token, err := col.ddl()
+		if err != nil {
+			err = errs.Wrap(ErrDDLBuild, errs.WithCause(err),
+				errs.WithContext("table", b.table.name))
+			return "", err
 		}
-		// Name
-		b.WriteString(name)
-		b.WriteString(" ")
-		col := db.table.columns[name]
-		// Type
-		switch col.kind {
-		case kindString:
-			b.WriteString("TEXT")
-		case kindTime:
-			b.WriteString("TEXT")
-		case kindInt64:
-			b.WriteString("INTEGER")
+		// Add comma.
+		if i < (len(b.table.columnNames) - 1) {
+			token += ","
 		}
-		// Null
-		if col.notNull {
-			b.WriteString(" NOT NULL")
-		}
-		// Default
-		fmt.Printf("ColKind=%s default=%#x\n", col.kind, col.defaultValue)
-		if len(col.defaultValue) > 0 {
-			switch col.kind {
-			case kindString:
-				ns, err := decodeNullString(col.defaultValue)
-				if err != nil {
-					return "", err
-				}
-				if ns.Valid {
-					b.WriteString(" DEFAULT ")
-					b.WriteString(strQuote)
-					b.WriteString(ns.String)
-					b.WriteString(strQuote)
-				} else {
-					b.WriteString(" DEFAULT NULL")
-				}
-			case kindInt64:
-				ni, err := decodeNullInt64(col.defaultValue)
-				if err != nil {
-					return "", err
-				}
-				if ni.Valid {
-					b.WriteString(" DEFAULT ")
-					b.WriteString(strconv.FormatInt(ni.Int64, 10))
-				} else {
-					b.WriteString(" DEFAULT NULL")
-				}
-			}
-		}
+		tokens = append(tokens, token)
 	}
-	b.WriteString(");")
-	return b.String(), nil
+	tokens = append(tokens, ")")
+	ddl := strings.Join(tokens, " ") + ";"
+	return ddl, nil
 }

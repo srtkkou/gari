@@ -35,6 +35,8 @@ var (
 	ErrDefaultValueKind = errors.New("orm.ErrDefaultValueKind")
 	// 初期値の長さエラー
 	ErrDefaultValueSize = errors.New("orm.ErrDefaultValueSize")
+	// DDL error.
+	ErrColumnDDL = errors.New("orm.ErrColumnDDL")
 )
 
 // 列の新規作成
@@ -163,6 +165,61 @@ func DefaultInt64(num int64) ColumnOption {
 // 検証ルール群の追加
 func (c *Column) AddRules(rules ...validation.Rule) {
 	c.rules = append(c.rules, rules...)
+}
+
+// Build DDL SQL.
+func (c *Column) ddl() (string, error) {
+	tokens := make([]string, 0)
+	// Name.
+	tokens = append(tokens, c.name)
+	// Type
+	switch c.kind {
+	case kindString:
+		tokens = append(tokens, "TEXT")
+	case kindTime:
+		tokens = append(tokens, "TEXT")
+	case kindInt64:
+		tokens = append(tokens, "INTEGER")
+	}
+	// Null
+	if c.notNull {
+		tokens = append(tokens, "NOT NULL")
+	}
+	// Default
+	if len(c.defaultValue) > 0 {
+		switch c.kind {
+		case kindString:
+			ns, err := decodeNullString(c.defaultValue)
+			if err != nil {
+				err = errs.Wrap(ErrColumnDDL, errs.WithCause(err),
+					errs.WithContext("columnName", c.name),
+					errs.WithContext("default", c.defaultValue))
+				return "", err
+			}
+			if ns.Valid {
+				tokens = append(tokens, "DEFAULT")
+				quote := c.table.gari.stringQuote
+				tokens = append(tokens, quote+ns.String+quote)
+			} else {
+				tokens = append(tokens, "DEFAULT NULL")
+			}
+		case kindInt64:
+			ni, err := decodeNullInt64(c.defaultValue)
+			if err != nil {
+				err = errs.Wrap(ErrColumnDDL, errs.WithCause(err),
+					errs.WithContext("columnName", c.name),
+					errs.WithContext("default", c.defaultValue))
+				return "", err
+			}
+			if ni.Valid {
+				tokens = append(tokens, "DEFAULT")
+				tokens = append(tokens, strconv.FormatInt(ni.Int64, 10))
+			} else {
+				tokens = append(tokens, "DEFAULT NULL")
+			}
+		}
+	}
+	return strings.Join(tokens, " "), nil
 }
 
 // 型のチェック
