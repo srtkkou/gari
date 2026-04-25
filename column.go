@@ -91,7 +91,7 @@ func NotNull() ColumnOption {
 // Set default value NULL.
 func DefaultNull() ColumnOption {
 	return func(c *Column) {
-		if !c.notNull {
+		if c.notNull {
 			err := errs.Wrap(ErrDefaultValueNull,
 				errs.WithContext("columnName", c.name),
 				errs.WithContext("notNull", c.notNull))
