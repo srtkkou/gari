@@ -10,6 +10,11 @@ import (
 )
 
 func TestSqlite(t *testing.T) {
+	// Define struct.
+	type sample struct {
+		Num  int
+		Text string
+	}
 	// Define samples table.
 	gari, err := New()
 	require.NoError(t, err)
@@ -28,4 +33,19 @@ func TestSqlite(t *testing.T) {
 	ctx := context.Background()
 	err = table.Migrate(ctx, db)
 	require.NoError(t, err)
+	// INSERT.
+	s1 := sample{Num: 101, Text: "str1"}
+	s2 := sample{Num: 102, Text: "str2"}
+	err = table.Insert(ctx, db, &s1, &s2)
+	require.NoError(t, err)
+	// SELECT.
+	samples := make([]sample, 0)
+	err = table.Select(&samples).OrderAsc("num").All(ctx, db)
+	require.NoError(t, err)
+	// Check result.
+	require.Equal(t, 2, len(samples))
+	require.Equal(t, 101, samples[0].Num)
+	require.Equal(t, "str1", samples[0].Text)
+	require.Equal(t, 102, samples[1].Num)
+	require.Equal(t, "str2", samples[1].Text)
 }

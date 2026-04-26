@@ -3,7 +3,10 @@ package gari
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+
+	"github.com/goark/errs"
 )
 
 type (
@@ -16,6 +19,10 @@ type (
 		jsonKeys    []string           // JSON key names.
 		columns     map[string]*Column // Map of columns.
 	}
+)
+
+var (
+	ErrInsert = errors.New("gari.ErrInsert")
 )
 
 // Create new table.
@@ -35,9 +42,38 @@ func (t *Table) Name() string {
 	return t.name
 }
 
-// Build SELECT statement.
+// Build SELECT SQL statement.
 func (t *Table) Select(ptr any) *selectBuilder {
 	return newSelectBuilder(t, ptr)
+}
+
+// Execute INSERT SQL statement.
+func (t *Table) Insert(
+	ctx context.Context, db *sql.DB, ptrs ...any,
+) error {
+	// Build SQL statement.
+	b := newInsertBuilder(ctx, t)
+	stmt, err := b.stmt(ptrs)
+	if err != nil {
+		return err
+	}
+	// Execute query.
+	result, err := db.ExecContext(ctx, stmt)
+	if err != nil {
+		return errs.Wrap(ErrInsert, errs.WithCause(err),
+			errs.WithContext("SQL", stmt))
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return errs.Wrap(ErrInsert, errs.WithCause(err),
+			errs.WithContext("SQL", stmt))
+	}
+	if count != int64(len(ptrs)) {
+		return errs.Wrap(ErrInsert, errs.WithCause(err),
+			errs.WithContext("SQL", stmt),
+			errs.WithContext("RowsAffected", count))
+	}
+	return nil
 }
 
 // Execute DDL SQL to migrate table.

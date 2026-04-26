@@ -263,6 +263,19 @@ func decodeNullInt64(blob []byte) (sql.NullInt64, error) {
 	return ni, nil
 }
 
+// Decode to map.
+func decodeMap(blob []byte) (map[string]any, error) {
+	r := bytes.NewReader(blob)
+	dec := msgpack.NewDecoder(r)
+	m, err := dec.DecodeMap()
+	if err != nil {
+		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
+			errs.WithContext("input", blob))
+		return m, err
+	}
+	return m, nil
+}
+
 // NULL in msgpack format.
 func msgpackNil() []byte {
 	return []byte{0xc0}
