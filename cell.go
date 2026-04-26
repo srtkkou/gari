@@ -19,10 +19,8 @@ type (
 )
 
 var (
-	// Cell kind error
-	ErrCellKind = errors.New("orm.ErrCellKind")
-	// Scan error
-	ErrScan = errors.New("orm.ErrScan")
+	ErrCellKind = errors.New("gari.ErrCellKind")
+	ErrScan     = errors.New("gari.ErrScan")
 )
 
 // Create new Cell struct.

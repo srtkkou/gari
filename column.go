@@ -29,14 +29,10 @@ type (
 )
 
 var (
-	// 初期値のNULLエラー
-	ErrDefaultValueNull = errors.New("orm.ErrDefaultValueNull")
-	// 初期値の型エラー
-	ErrDefaultValueKind = errors.New("orm.ErrDefaultValueKind")
-	// 初期値の長さエラー
-	ErrDefaultValueSize = errors.New("orm.ErrDefaultValueSize")
-	// DDL error.
-	ErrColumnDDL = errors.New("orm.ErrColumnDDL")
+	ErrDefaultValueNull = errors.New("gari.ErrDefaultValueNull")
+	ErrDefaultValueKind = errors.New("gari.ErrDefaultValueKind")
+	ErrDefaultValueSize = errors.New("gari.ErrDefaultValueSize")
+	ErrColumnDDL        = errors.New("gari.ErrColumnDDL")
 )
 
 // 列の新規作成

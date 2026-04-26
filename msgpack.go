@@ -24,15 +24,15 @@ const (
 
 var (
 	// msgpack encode error.
-	ErrMsgpackEncode = errors.New("orm.ErrMsgpackEncode")
+	ErrMsgpackEncode = errors.New("gari.ErrMsgpackEncode")
 	// msgpack decode error.
-	ErrMsgpackDecode = errors.New("orm.ErrMsgpackDecode")
+	ErrMsgpackDecode = errors.New("gari.ErrMsgpackDecode")
 	// msgpack encode input type error.
-	ErrMsgpackInputType = errors.New("orm.ErrMsgpackInputType")
+	ErrMsgpackInputType = errors.New("gari.ErrMsgpackInputType")
 	// msgpack oversized array error.
-	ErrMsgpackArraySize = errors.New("orm.ErrMsgpackArraySize")
+	ErrMsgpackArraySize = errors.New("gari.ErrMsgpackArraySize")
 	// msgpack oversized map error.
-	ErrMsgpackMapSize = errors.New("orm.ErrMsgpackMapSize")
+	ErrMsgpackMapSize = errors.New("gari.ErrMsgpackMapSize")
 )
 
 // Encode NULL or bool value.
