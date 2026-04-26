@@ -14,6 +14,8 @@ import (
 
 type (
 	selectBuilder struct {
+		ctx        context.Context
+		db         *sql.DB
 		from       *Table
 		ptr        any
 		cells      []*Cell
@@ -28,9 +30,13 @@ var (
 )
 
 // Create new selectBuilder.
-func newSelectBuilder(t *Table, ptr any) *selectBuilder {
+func newSelectBuilder(
+	ctx context.Context, db *sql.DB, t *Table, ptr any,
+) *selectBuilder {
 	// Initialize selectBuilder.
-	sb := selectBuilder{
+	b := selectBuilder{
+		ctx:        ctx,
+		db:         db,
 		from:       t,
 		ptr:        ptr,
 		cells:      make([]*Cell, len(t.columnNames)),
@@ -39,102 +45,98 @@ func newSelectBuilder(t *Table, ptr any) *selectBuilder {
 	// Initialize cells from columns.
 	for i, name := range t.columnNames {
 		col := t.columns[name]
-		sb.cells[i] = newCell(col)
+		b.cells[i] = newCell(col)
 	}
-	return &sb
+	return &b
 }
 
 // Add ORDER BY ASC statement.
-func (sb *selectBuilder) OrderAsc(name string) *selectBuilder {
-	if sb.err != nil {
-		return sb
+func (b *selectBuilder) OrderAsc(name string) *selectBuilder {
+	if b.err != nil {
+		return b
 	}
-	stmt := sb.orderByStmt(name) + " ASC"
-	sb.orderStmts = append(sb.orderStmts, stmt)
-	return sb
+	stmt := b.orderByStmt(name) + " ASC"
+	b.orderStmts = append(b.orderStmts, stmt)
+	return b
 }
 
 // Add ORDER BY DESC statement.
-func (sb *selectBuilder) OrderDesc(name string) *selectBuilder {
-	if sb.err != nil {
-		return sb
+func (b *selectBuilder) OrderDesc(name string) *selectBuilder {
+	if b.err != nil {
+		return b
 	}
-	stmt := sb.orderByStmt(name) + " DESC"
-	sb.orderStmts = append(sb.orderStmts, stmt)
-	return sb
+	stmt := b.orderByStmt(name) + " DESC"
+	b.orderStmts = append(b.orderStmts, stmt)
+	return b
 }
 
 // Select one item.
-func (sb *selectBuilder) First(
-	ctx context.Context, db *sql.DB,
-) error {
-	if sb.err != nil {
-		return sb.err
+func (b *selectBuilder) First() error {
+	if b.err != nil {
+		return b.err
 	}
 	// Build SQL statement.
-	query := sb.selectStmt() +
-		` ORDER BY ` + strings.Join(sb.orderStmts, ", ") +
+	query := b.selectStmt() +
+		` ORDER BY ` + strings.Join(b.orderStmts, ", ") +
 		` LIMIT 1;`
 	fmt.Printf("----First----\n")
 	fmt.Printf("--query=%s\n", query)
 	// Execute query.
-	row := db.QueryRowContext(ctx, query)
-	err := row.Scan(sb.scanArgs()...)
+	row := b.db.QueryRowContext(b.ctx, query)
+	err := row.Scan(b.scanArgs()...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return err
 	} else if err != nil {
 		return err
 	}
 	// Build msgpack bytes.
-	blob, err := sb.msgpackMapBytes()
+	blob, err := b.msgpackMapBytes()
 	if err != nil {
 		return err
 	}
 	fmt.Printf("msgpack=%#x\n", blob)
 	// Unmarshal model.
-	err = msgpack.Unmarshal(blob, sb.ptr)
+	err = msgpack.Unmarshal(blob, b.ptr)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (sb *selectBuilder) All(
-	ctx context.Context, db *sql.DB,
-) error {
-	if sb.err != nil {
-		return sb.err
+func (b *selectBuilder) All() error {
+	if b.err != nil {
+		return b.err
 	}
 	// Build SQL statement.
-	query := sb.selectStmt() +
-		` ORDER BY ` + strings.Join(sb.orderStmts, ", ") + ";"
+	query := b.selectStmt() +
+		` ORDER BY ` + strings.Join(b.orderStmts, ", ") + ";"
 	fmt.Printf("----All----\n")
 	fmt.Printf("--query=%s\n", query)
 	// Execute query.
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := b.db.QueryContext(b.ctx, query)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	// Scan rows.
-	var b bytes.Buffer
+	var buf bytes.Buffer
 	count := 0
 	for rows.Next() {
 		// Count up.
 		count += 1
 		fmt.Printf("--rows.Next():count=%d\n", count)
 		// Scan row.
-		err = rows.Scan(sb.scanArgs()...)
+		err = rows.Scan(b.scanArgs()...)
 		if err != nil {
 			fmt.Printf("--err=%v\n", err)
 			return err
 		}
 		// msgpack形式に変換
-		mapBytes, err := sb.msgpackMapBytes()
+		mapBytes, err := b.msgpackMapBytes()
 		if err != nil {
 			return err
 		}
-		b.Write(mapBytes)
+		buf.Write(mapBytes)
 	}
 	// msgpackバイト列に配列ヘッダをつける。
 	arrayBytes, err := msgpackArrayHeader(count)
@@ -142,10 +144,10 @@ func (sb *selectBuilder) All(
 		return err
 	}
 	// msgpackの組み立て
-	blob := append(arrayBytes, b.Bytes()...)
+	blob := append(arrayBytes, buf.Bytes()...)
 	fmt.Printf("msgpack=%#x\n", blob)
 	// Unmarshal model
-	err = msgpack.Unmarshal(blob, sb.ptr)
+	err = msgpack.Unmarshal(blob, b.ptr)
 	if err != nil {
 		fmt.Printf("--UnmarshalErr=%v\n", err)
 		return err
@@ -158,75 +160,75 @@ func (sb *selectBuilder) All(
 }
 
 // Build SELECT FROM statement
-func (sb *selectBuilder) selectStmt() string {
-	var b strings.Builder
-	colQuote := sb.from.gari.columnQuote
-	b.WriteString("SELECT ")
-	for i, cell := range sb.cells {
+func (b *selectBuilder) selectStmt() string {
+	var sb strings.Builder
+	quote := b.from.gari.columnQuote
+	sb.WriteString("SELECT ")
+	for i, cell := range b.cells {
 		if i > 0 {
-			b.WriteString(", ")
+			sb.WriteString(", ")
 		}
-		b.WriteString(colQuote)
-		b.WriteString(sb.from.Name())
-		b.WriteString(colQuote)
-		b.WriteString(".")
-		b.WriteString(colQuote)
-		b.WriteString(cell.column.name)
-		b.WriteString(colQuote)
+		sb.WriteString(quote)
+		sb.WriteString(b.from.Name())
+		sb.WriteString(quote)
+		sb.WriteString(".")
+		sb.WriteString(quote)
+		sb.WriteString(cell.column.name)
+		sb.WriteString(quote)
 	}
-	b.WriteString(" FROM ")
-	b.WriteString(colQuote)
-	b.WriteString(sb.from.Name())
-	b.WriteString(colQuote)
-	return b.String()
+	sb.WriteString(" FROM ")
+	sb.WriteString(quote)
+	sb.WriteString(b.from.name)
+	sb.WriteString(quote)
+	return sb.String()
 }
 
 // Build  ORDER BY statement.
-func (sb *selectBuilder) orderByStmt(name string) string {
+func (b *selectBuilder) orderByStmt(name string) string {
 	// Get column.
-	col, ok := sb.from.columns[name]
+	col, ok := b.from.columns[name]
 	if !ok {
-		sb.err = errs.Wrap(ErrColumnNotFound, errs.WithContext("name", name))
+		b.err = errs.Wrap(ErrColumnNotFound, errs.WithContext("name", name))
 		return ""
 	}
 	// Build stmt.
-	var b strings.Builder
-	colQuote := sb.from.gari.columnQuote
-	b.WriteString(colQuote)
-	b.WriteString(sb.from.Name())
-	b.WriteString(colQuote)
-	b.WriteString(".")
-	b.WriteString(colQuote)
-	b.WriteString(col.name)
-	b.WriteString(colQuote)
-	return b.String()
+	var sb strings.Builder
+	quote := b.from.gari.columnQuote
+	sb.WriteString(quote)
+	sb.WriteString(b.from.name)
+	sb.WriteString(quote)
+	sb.WriteString(".")
+	sb.WriteString(quote)
+	sb.WriteString(col.name)
+	sb.WriteString(quote)
+	return sb.String()
 }
 
 // Convert type of sb.cells to []any.
-func (sb *selectBuilder) scanArgs() []any {
-	args := make([]any, len(sb.cells))
-	for i, cell := range sb.cells {
+func (b *selectBuilder) scanArgs() []any {
+	args := make([]any, len(b.cells))
+	for i, cell := range b.cells {
 		args[i] = cell
 	}
 	return args
 }
 
 // msgpack map bytes.
-func (sb *selectBuilder) msgpackMapBytes() ([]byte, error) {
-	var b bytes.Buffer
+func (b *selectBuilder) msgpackMapBytes() ([]byte, error) {
+	var buf bytes.Buffer
 	// Build map header.
-	headerBytes, err := msgpackMapHeader(len(sb.cells))
+	headerBytes, err := msgpackMapHeader(len(b.cells))
 	if err != nil {
 		return []byte{}, err
 	}
-	b.Write(headerBytes)
+	buf.Write(headerBytes)
 	// Write key value pair.
-	for _, cell := range sb.cells {
+	for _, cell := range b.cells {
 		keyValueBytes, err := cell.MsgpackBytes()
 		if err != nil {
 			return []byte{}, err
 		}
-		b.Write(keyValueBytes)
+		buf.Write(keyValueBytes)
 	}
-	return b.Bytes(), err
+	return buf.Bytes(), err
 }

@@ -40,7 +40,7 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	// SELECT.
 	samples := make([]sample, 0)
-	err = table.Select(&samples).OrderAsc("num").All(ctx, db)
+	err = table.Select(ctx, db, &samples).OrderAsc("num").All()
 	require.NoError(t, err)
 	// Check result.
 	require.Equal(t, 2, len(samples))
