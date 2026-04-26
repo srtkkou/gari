@@ -23,6 +23,7 @@ type (
 
 var (
 	ErrInsert = errors.New("gari.ErrInsert")
+	ErrUpdate = errors.New("gari.ErrUpdate")
 )
 
 // Create new table.
@@ -53,6 +54,10 @@ func (t *Table) Select(
 func (t *Table) Insert(
 	ctx context.Context, db *sql.DB, ptrs ...any,
 ) error {
+	if len(ptrs) == 0 {
+		return errs.Wrap(ErrInsert,
+			errs.WithContext("SizeOfPtrs", len(ptrs)))
+	}
 	// Build SQL statement.
 	b := newInsertBuilder(ctx, t)
 	stmt, err := b.stmt(ptrs)
@@ -74,6 +79,61 @@ func (t *Table) Insert(
 		return errs.Wrap(ErrInsert, errs.WithCause(err),
 			errs.WithContext("SQL", stmt),
 			errs.WithContext("RowsAffected", count))
+	}
+	return nil
+}
+
+// Execute UPDATE SQL statement.
+func (t *Table) Update(
+	ctx context.Context, db *sql.DB, ptrs ...any,
+) error {
+	if len(ptrs) == 0 {
+		return errs.Wrap(ErrUpdate,
+			errs.WithContext("sizeOfPtrs", len(ptrs)))
+	}
+	// Prepare SQL statement.
+	b := newUpdateBuilder(ctx, t)
+	err := b.parse(ptrs)
+	if err != nil {
+		return errs.Wrap(ErrUpdate, errs.WithCause(err))
+	}
+	query, err := b.query()
+	if err != nil {
+		return errs.Wrap(ErrUpdate, errs.WithCause(err))
+	}
+	stmt, err := db.PrepareContext(ctx, query)
+	if err != nil {
+		return errs.Wrap(ErrUpdate, errs.WithCause(err))
+	}
+	defer stmt.Close()
+	// Execute query for each struct.
+	for _, ptr := range ptrs {
+		// Get args,
+		args, err := b.args()
+		if err != nil {
+			return errs.Wrap(ErrUpdate, errs.WithCause(err),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args))
+		}
+		// Execute query.
+		result, err := stmt.ExecContext(ctx, args...)
+		if err != nil {
+			return errs.Wrap(ErrUpdate, errs.WithCause(err),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args))
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return errs.Wrap(ErrUpdate, errs.WithCause(err),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args))
+		}
+		if count != 1 {
+			return errs.Wrap(ErrUpdate,
+				errs.WithContext("rowsAffected", count),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args))
+		}
 	}
 	return nil
 }
