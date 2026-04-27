@@ -38,8 +38,6 @@ func newTable(g *Gari, name string) *Table {
 		fieldNames:  make([]string, 0),
 		columns:     make(map[string]*Column, 0),
 	}
-	t.insertBuilder = newInsertBuilder(&t)
-	t.updateBuilder = newUpdateBuilder(&t)
 	return &t
 }
 
@@ -62,6 +60,10 @@ func (t *Table) Insert(
 	if len(ptrs) == 0 {
 		return errs.Wrap(ErrInsert,
 			errs.WithContext("SizeOfPtrs", len(ptrs)))
+	}
+	// Prepare insertBuilder.
+	if t.insertBuilder == nil {
+		t.insertBuilder = newInsertBuilder(t)
 	}
 	// Prepare INSERT SQL statement.
 	query := t.insertBuilder.query
@@ -110,6 +112,10 @@ func (t *Table) Update(
 	if len(ptrs) == 0 {
 		return errs.Wrap(ErrUpdate,
 			errs.WithContext("sizeOfPtrs", len(ptrs)))
+	}
+	// Prepare updateBuilder.
+	if t.updateBuilder == nil {
+		t.updateBuilder = newUpdateBuilder(t)
 	}
 	// Prepare UPDATE SQL statement.
 	query := t.updateBuilder.query

@@ -29,7 +29,7 @@ var (
 func newInsertBuilder(t *Table) *insertBuilder {
 	b := insertBuilder{
 		table:      t,
-		fieldNames: make([]string, len(t.columnNames), 0),
+		fieldNames: make([]string, 0, len(t.columnNames)),
 	}
 	// Set field names except "id" column.
 	for _, name := range t.columnNames {
@@ -82,32 +82,32 @@ func (b *insertBuilder) buildArgs(ptr any) ([]any, error) {
 	}
 	// Build args.
 	quote := b.table.gari.stringQuote
-	args := make([]any, len(b.fieldNames), 0)
-	for _, fieldName := range b.fieldNames {
+	args := make([]any, len(b.fieldNames))
+	for i, fieldName := range b.fieldNames {
 		v := m[fieldName]
 		switch tv := v.(type) {
 		case nil:
-			args = append(args, "NULL")
+			args[i] = "NULL"
 		case string:
-			args = append(args, quote+tv+quote)
+			args[i] = quote + tv + quote
 		case time.Time:
-			args = append(args, quote+tv.Format("20060102 15:06:07.999999")+quote)
+			args[i] = quote + tv.Format("20060102 15:06:07.999999") + quote
 		case int8:
-			args = append(args, strconv.FormatInt(int64(tv), 10))
+			args[i] = strconv.FormatInt(int64(tv), 10)
 		case int16:
-			args = append(args, strconv.FormatInt(int64(tv), 10))
+			args[i] = strconv.FormatInt(int64(tv), 10)
 		case int32:
-			args = append(args, strconv.FormatInt(int64(tv), 10))
+			args[i] = strconv.FormatInt(int64(tv), 10)
 		case int64:
-			args = append(args, strconv.FormatInt(tv, 10))
+			args[i] = strconv.FormatInt(tv, 10)
 		case uint16:
-			args = append(args, strconv.FormatUint(uint64(tv), 10))
+			args[i] = strconv.FormatUint(uint64(tv), 10)
 		case uint32:
-			args = append(args, strconv.FormatUint(uint64(tv), 10))
+			args[i] = strconv.FormatUint(uint64(tv), 10)
 		case uint64:
-			args = append(args, strconv.FormatUint(tv, 10))
+			args[i] = strconv.FormatUint(tv, 10)
 		default:
-			args = append(args, "ERR")
+			args[i] = "ERR"
 		}
 	}
 	return args, nil
