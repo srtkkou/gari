@@ -1,101 +1,114 @@
 package gari
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/goark/errs"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
 	// Builder to build INSERT SQL.
 	insertBuilder struct {
-		ctx   context.Context // Context.
-		table *Table          // Pointer to table.
+		table      *Table // Pointer to table.
+		fieldNames []string
+		query      string
 	}
 )
 
+var (
+	ErrInsertBuilderBuildArgs = errors.New("gari.ErrInsertBuilderBuildArgs")
+)
+
 // Create new insertBuilder instance.
-func newInsertBuilder(
-	ctx context.Context, t *Table,
-) *insertBuilder {
+func newInsertBuilder(t *Table) *insertBuilder {
 	b := insertBuilder{
-		ctx:   ctx,
-		table: t,
+		table:      t,
+		fieldNames: make([]string, len(t.columnNames), 0),
 	}
+	// Set field names except "id" column.
+	for _, name := range t.columnNames {
+		if name != "id" {
+			col := t.columns[name]
+			b.fieldNames = append(b.fieldNames, col.fieldName)
+		}
+	}
+	// Sort field names.
+	sort.Strings(b.fieldNames)
+	// Build INSERT SQL query.
+	b.query = b.buildQuery()
+	fmt.Printf("INSERT FIELDS=[%v] QUERY=%s\n", b.fieldNames, b.query)
 	return &b
 }
 
-// Build SQL statement.
-func (b *insertBuilder) stmt(ptrs []any) (string, error) {
-	tokens := make([]string, 0)
-	tokens = append(tokens, "INSERT INTO")
-	tokens = append(tokens, b.table.name)
-	tokens = append(tokens,
-		"("+strings.Join(b.table.fieldNames, ", ")+")")
-	tokens = append(tokens, "VALUES")
-
-	blocks := make([]string, len(ptrs))
-	for i, ptr := range ptrs {
-		// Convert to msgpack.
-		blob, err := msgpack.Marshal(ptr)
-		if err != nil {
-			return "", err
-		}
-		fmt.Printf("INSERT msgpack=%#x\n", blob)
-		// Convert to map.
-		m, err := decodeMap(blob)
-		if err != nil {
-			return "", err
-		}
-		for k, v := range m {
-			fmt.Printf("key=%s,value=%v(%T)\n", k, v, v)
-		}
-		// Build token.
-		values := make([]string, len(b.table.fieldNames))
-		for j, fieldName := range b.table.fieldNames {
-			//			col := b.table.columns[fieldName]
-			v, ok := m[fieldName]
-			if !ok {
-				return "", errors.New("NO FIELD FOUND ON GIVEN STRUCT")
-			}
-			quote := b.table.gari.stringQuote
-			switch tv := v.(type) {
-			case nil:
-				values[j] = "NULL"
-			case string:
-				values[j] = quote + tv + quote
-			case time.Time:
-				values[j] = quote + tv.Format("20060102 15:06:07.999999") + quote
-			case int8:
-				values[j] = strconv.FormatInt(int64(tv), 10)
-			case int16:
-				values[j] = strconv.FormatInt(int64(tv), 10)
-			case int32:
-				values[j] = strconv.FormatInt(int64(tv), 10)
-			case int64:
-				values[j] = strconv.FormatInt(tv, 10)
-			case uint16:
-				values[j] = strconv.FormatUint(uint64(tv), 10)
-			case uint32:
-				values[j] = strconv.FormatUint(uint64(tv), 10)
-			case uint64:
-				values[j] = strconv.FormatUint(tv, 10)
-			default:
-				values[j] = "ERR"
-			}
-		}
-		// Build VALUES block.
-		blocks[i] = "(" + strings.Join(values, ", ") + ")"
+// Build INSERT SQL statement.
+func (b *insertBuilder) buildQuery() string {
+	tokens := []string{
+		"INSERT", "INTO", b.table.name, "VALUES",
 	}
-	// Build insert SQL.
-	token := strings.Join(blocks, ", ")
-	tokens = append(tokens, token)
-	stmt := strings.Join(tokens, " ") + ";"
-	fmt.Printf("INSERT SQL=%s\n", stmt)
-	return stmt, nil
+	// Build values token.
+	values := make([]string, len(b.fieldNames))
+	for i := range b.fieldNames {
+		values[i] = "?"
+	}
+	valuesToken := fmt.Sprintf("(%s);",
+		strings.Join(values, ", "))
+	tokens = append(tokens, valuesToken)
+	return strings.Join(tokens, " ")
+}
+
+// Build argument of ptr.
+func (b *insertBuilder) buildArgs(ptr any) ([]any, error) {
+	// Convert to msgpack.
+	blob, err := msgpack.Marshal(ptr)
+	if err != nil {
+		err = errs.Wrap(ErrInsertBuilderBuildArgs,
+			errs.WithCause(err))
+		return []any{}, err
+	}
+	// Unmarshal msgpack.
+	var m map[string]any
+	err = msgpack.Unmarshal(blob, &m)
+	if err != nil {
+		err = errs.Wrap(ErrInsertBuilderBuildArgs,
+			errs.WithCause(err),
+			errs.WithContext("msgpack", blob))
+		return []any{}, err
+	}
+	// Build args.
+	quote := b.table.gari.stringQuote
+	args := make([]any, len(b.fieldNames), 0)
+	for _, fieldName := range b.fieldNames {
+		v := m[fieldName]
+		switch tv := v.(type) {
+		case nil:
+			args = append(args, "NULL")
+		case string:
+			args = append(args, quote+tv+quote)
+		case time.Time:
+			args = append(args, quote+tv.Format("20060102 15:06:07.999999")+quote)
+		case int8:
+			args = append(args, strconv.FormatInt(int64(tv), 10))
+		case int16:
+			args = append(args, strconv.FormatInt(int64(tv), 10))
+		case int32:
+			args = append(args, strconv.FormatInt(int64(tv), 10))
+		case int64:
+			args = append(args, strconv.FormatInt(tv, 10))
+		case uint16:
+			args = append(args, strconv.FormatUint(uint64(tv), 10))
+		case uint32:
+			args = append(args, strconv.FormatUint(uint64(tv), 10))
+		case uint64:
+			args = append(args, strconv.FormatUint(tv, 10))
+		default:
+			args = append(args, "ERR")
+		}
+	}
+	return args, nil
 }

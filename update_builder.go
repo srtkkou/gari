@@ -1,7 +1,6 @@
 package gari
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -9,92 +8,83 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goark/errs"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
 	// Builder to build UPDATE SQL.
 	updateBuilder struct {
-		ctx        context.Context    // Context.
-		table      *Table             // Pointer to table.
-		maps       [](map[string]any) // Maps of structs.
-		fieldNames []string           // Sorted field names of struct.
+		table      *Table   // Pointer to table.
+		fieldNames []string // Sorted field names of struct.
+		query      string   // UPDATE SQL query.
 	}
 )
 
 var (
-	ErrUpdateBuilderParse = errors.New("gari.ErrUpdateBuilderParse")
+	ErrUpdateBuilderBuildArgs = errors.New("gari.ErrUpdateBuilderBuildArgs")
 )
 
 // Create new updateBuilder instance.
-func newUpdateBuilder(
-	ctx context.Context, t *Table,
-) *updateBuilder {
+func newUpdateBuilder(t *Table) *updateBuilder {
 	b := updateBuilder{
-		ctx:   ctx,
-		table: t,
-		maps:  make([]map[string]any),
+		table:      t,
+		fieldNames: make([]string, len(t.columnNames), 0),
 	}
+	// Set field names except "id" column.
+	for _, name := range t.columnNames {
+		if name != "id" {
+			col := t.columns[name]
+			b.fieldNames = append(b.fieldNames, col.fieldName)
+		}
+	}
+	// Sort field names.
+	sort.Strings(b.fieldNames)
+	// Build UPDATE SQL query.
+	b.query = b.buildQuery()
+	fmt.Printf("UPDATE QUERY=%s\n", b.query)
 	return &b
 }
 
-// Parse ptrs.
-func (b *updateBuilder) parse(ptrs []any) error {
-	// Convert to msgpack.
-	blob, err := msgpack.Marshal(ptr)
-	if err != nil {
-		return errs.Wrap(ErrUpdateBuilderParse, errs.WithCause(err))
-	}
-	// Unmarshal msgpack.
-	err := msgpack.Unmarshal(blob, &b.maps)
-	if err != nil {
-		return errs.Wrap(ErrUpdateBuilderParse, errs.WithCause(err),
-			errs.WithContext("msgpack", blob))
-	}
-	// Check size of maps.
-	if len(maps) == 0 {
-		return errs.Wrap(ErrUpdateBuilderParse,
-			errs.WithContext("maps", maps))
-	}
-	// Prepare sorted field names.
-	b.fieldNames := make([]string, len(b.maps), 0)
-	for k := range b.maps[0] {
-		if k != "Id" {
-			b.fieldNames = append(b.fieldNames, k)
-		}
-	}
-	sort.Strings(b.fieldNames)
-	b.fieldNames = append(b.fieldNames, "Id")
-	return nil
-}
-
 // Build SQL statement.
-func (b *updateBuilder) query() (string, error) {
-	tokens := make([]string, 0)
-	tokens = append(tokens, "UPDATE")
-	tokens = append(tokens, b.table.name)
-	tokens = append(tokens, "SET")
-	// Build token.
-	values := make([]string, len(b.maps), 0)
-	for _, fieldName := range b.fieldNames {
-		col, ok := b.table.columns[fieldName]
-		if !ok {
-			return "", fmt.Errorf("%s is not a table field", k)
-		}
-		values = append(values, col.name+" = ?")
+func (b *updateBuilder) buildQuery() string {
+	tokens := []string{
+		"UPDATE", b.table.name, "SET",
+	}
+	// Build values token.
+	values := make([]string, len(b.fieldNames))
+	for i, fieldName := range b.fieldNames {
+		col := b.table.columns[fieldName]
+		values[i] = fmt.Sprintf("%s = ?", col.name)
 	}
 	tokens = append(tokens, strings.Join(values, ", "))
-	tokens = append(tokens, "WHERE ID = ?")
-	stmt := strings.Join(tokens, " ") + ";"
-	fmt.Printf("UPDATE SQL=%s\n", stmt)
-	return stmt, nil
+	tokens = append(tokens, "WHERE ID = ?;")
+	return strings.Join(tokens, " ")
 }
 
 // Build argument of ptr.
-func (b *updateBuilder) args() ([]any, error) {
+func (b *updateBuilder) buildArgs(ptr any) ([]any, error) {
+	// Convert to msgpack.
+	blob, err := msgpack.Marshal(ptr)
+	if err != nil {
+		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
+			errs.WithCause(err))
+		return []any{}, err
+	}
+	// Unmarshal msgpack.
+	var m map[string]any
+	err = msgpack.Unmarshal(blob, &m)
+	if err != nil {
+		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
+			errs.WithCause(err),
+			errs.WithContext("msgpack", blob))
+		return []any{}, err
+	}
+	// Build args.
 	quote := b.table.gari.stringQuote
-	args := make([]any, len(b.maps), 0)
-	for k, v := range b.fieldNames {
+	args := make([]any, len(b.fieldNames), 0)
+	for _, fieldName := range b.fieldNames {
+		v := m[fieldName]
 		switch tv := v.(type) {
 		case nil:
 			args = append(args, "NULL")

@@ -12,12 +12,15 @@ import (
 type (
 	// Table
 	Table struct {
-		gari        *Gari              // Pointer to gari config.
-		name        string             // Table name.
-		columnNames []string           // Column names.
-		fieldNames  []string           // Attribute names.
-		jsonKeys    []string           // JSON key names.
-		columns     map[string]*Column // Map of columns.
+		gari           *Gari              // Pointer to gari config.
+		name           string             // Table name.
+		columnNames    []string           // Column names.
+		fieldNames     []string           // Attribute names.
+		columns        map[string]*Column // Map of columns.
+		insertBuilder  *insertBuilder     // INSERT builder.
+		preparedInsert *sql.Stmt          // Prepared INSERT statement.
+		updateBuilder  *updateBuilder     // UPDATE builder.
+		preparedUpdate *sql.Stmt          // Prepared UPDATE statement.
 	}
 )
 
@@ -28,14 +31,16 @@ var (
 
 // Create new table.
 func newTable(g *Gari, name string) *Table {
-	return &Table{
+	t := Table{
 		gari:        g,
 		name:        name,
 		columnNames: make([]string, 0),
 		fieldNames:  make([]string, 0),
-		jsonKeys:    make([]string, 0),
 		columns:     make(map[string]*Column, 0),
 	}
+	t.insertBuilder = newInsertBuilder(&t)
+	t.updateBuilder = newUpdateBuilder(&t)
+	return &t
 }
 
 // Table name.
@@ -53,32 +58,47 @@ func (t *Table) Select(
 // Execute INSERT SQL statement.
 func (t *Table) Insert(
 	ctx context.Context, db *sql.DB, ptrs ...any,
-) error {
+) (err error) {
 	if len(ptrs) == 0 {
 		return errs.Wrap(ErrInsert,
 			errs.WithContext("SizeOfPtrs", len(ptrs)))
 	}
-	// Build SQL statement.
-	b := newInsertBuilder(ctx, t)
-	stmt, err := b.stmt(ptrs)
-	if err != nil {
-		return err
+	// Prepare INSERT SQL statement.
+	query := t.insertBuilder.query
+	if t.preparedInsert == nil {
+		t.preparedInsert, err = db.PrepareContext(ctx, query)
+		if err != nil {
+			return errs.Wrap(ErrInsert, errs.WithCause(err),
+				errs.WithContext("query", query))
+		}
 	}
 	// Execute query.
-	result, err := db.ExecContext(ctx, stmt)
-	if err != nil {
-		return errs.Wrap(ErrInsert, errs.WithCause(err),
-			errs.WithContext("SQL", stmt))
-	}
-	count, err := result.RowsAffected()
-	if err != nil {
-		return errs.Wrap(ErrInsert, errs.WithCause(err),
-			errs.WithContext("SQL", stmt))
-	}
-	if count != int64(len(ptrs)) {
-		return errs.Wrap(ErrInsert, errs.WithCause(err),
-			errs.WithContext("SQL", stmt),
-			errs.WithContext("RowsAffected", count))
+	for _, ptr := range ptrs {
+		// Build args.
+		args, err := t.insertBuilder.buildArgs(ptr)
+		if err != nil {
+			return errs.Wrap(ErrInsert, errs.WithCause(err),
+				errs.WithContext("query", query))
+		}
+		// Execute query.
+		result, err := t.preparedInsert.ExecContext(ctx, args...)
+		if err != nil {
+			return errs.Wrap(ErrInsert, errs.WithCause(err),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args))
+		}
+		count, err := result.RowsAffected()
+		if err != nil {
+			return errs.Wrap(ErrInsert, errs.WithCause(err),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args))
+		}
+		if count != 1 {
+			return errs.Wrap(ErrInsert, errs.WithCause(err),
+				errs.WithContext("query", query),
+				errs.WithContext("args", args),
+				errs.WithContext("rowsAffected", count))
+		}
 	}
 	return nil
 }
@@ -86,37 +106,30 @@ func (t *Table) Insert(
 // Execute UPDATE SQL statement.
 func (t *Table) Update(
 	ctx context.Context, db *sql.DB, ptrs ...any,
-) error {
+) (err error) {
 	if len(ptrs) == 0 {
 		return errs.Wrap(ErrUpdate,
 			errs.WithContext("sizeOfPtrs", len(ptrs)))
 	}
-	// Prepare SQL statement.
-	b := newUpdateBuilder(ctx, t)
-	err := b.parse(ptrs)
-	if err != nil {
-		return errs.Wrap(ErrUpdate, errs.WithCause(err))
+	// Prepare UPDATE SQL statement.
+	query := t.updateBuilder.query
+	if t.preparedUpdate == nil {
+		t.preparedUpdate, err = db.PrepareContext(ctx, query)
+		if err != nil {
+			return errs.Wrap(ErrUpdate, errs.WithCause(err))
+		}
 	}
-	query, err := b.query()
-	if err != nil {
-		return errs.Wrap(ErrUpdate, errs.WithCause(err))
-	}
-	stmt, err := db.PrepareContext(ctx, query)
-	if err != nil {
-		return errs.Wrap(ErrUpdate, errs.WithCause(err))
-	}
-	defer stmt.Close()
 	// Execute query for each struct.
 	for _, ptr := range ptrs {
 		// Get args,
-		args, err := b.args()
+		args, err := t.updateBuilder.buildArgs(ptr)
 		if err != nil {
 			return errs.Wrap(ErrUpdate, errs.WithCause(err),
 				errs.WithContext("query", query),
 				errs.WithContext("args", args))
 		}
 		// Execute query.
-		result, err := stmt.ExecContext(ctx, args...)
+		result, err := t.preparedUpdate.ExecContext(ctx, args...)
 		if err != nil {
 			return errs.Wrap(ErrUpdate, errs.WithCause(err),
 				errs.WithContext("query", query),
@@ -147,6 +160,15 @@ func (t *Table) Migrate(ctx context.Context, db *sql.DB) error {
 	_, err = db.ExecContext(ctx, ddl)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (t *Table) Close() (err error) {
+	if t.preparedUpdate != nil {
+		if err = t.preparedUpdate.Close(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
