@@ -25,6 +25,7 @@ func TestSqlite(t *testing.T) {
 			NotNull(), Size(255), DefaultString("default")).
 		Define()
 	require.NoError(t, err)
+	defer table.Close()
 	// Open SQLite
 	db, err := sql.Open("sqlite", ":memory:?_foreign_keys(1)")
 	require.NoError(t, err)
@@ -36,16 +37,19 @@ func TestSqlite(t *testing.T) {
 	// INSERT.
 	s1 := sample{Num: 101, Text: "str1"}
 	s2 := sample{Num: 102, Text: "str2"}
-	err = table.Insert(ctx, db, &s1, &s2)
+	s3 := sample{Num: 103, Text: "str3"}
+	err = table.Insert(ctx, db, &s1, &s2, &s3)
 	require.NoError(t, err)
 	// SELECT.
 	samples := make([]sample, 0)
 	err = table.Select(ctx, db, &samples).OrderAsc("num").All()
 	require.NoError(t, err)
 	// Check result.
-	require.Equal(t, 2, len(samples))
+	require.Equal(t, 3, len(samples))
 	require.Equal(t, 101, samples[0].Num)
 	require.Equal(t, "str1", samples[0].Text)
 	require.Equal(t, 102, samples[1].Num)
 	require.Equal(t, "str2", samples[1].Text)
+	require.Equal(t, 103, samples[2].Num)
+	require.Equal(t, "str3", samples[2].Text)
 }
