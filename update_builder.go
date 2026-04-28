@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -48,18 +47,32 @@ func newUpdateBuilder(t *Table) *updateBuilder {
 
 // Build SQL statement.
 func (b *updateBuilder) buildQuery() string {
-	tokens := []string{
-		"UPDATE", b.table.name, "SET",
-	}
-	// Build values token.
-	values := make([]string, len(b.fieldNames))
+	var sb strings.Builder
+	sb.WriteString("UPDATE ")
+	// Build table statement.
+	quote := b.table.gari.columnQuote
+	sb.WriteString(quote)
+	sb.WriteString(b.table.name)
+	sb.WriteString(quote)
+	sb.WriteString(" SET ")
+	// Build values statement.
 	for i, fieldName := range b.fieldNames {
 		col := b.table.columns[fieldName]
-		values[i] = fmt.Sprintf("%s = ?", col.name)
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(quote)
+		sb.WriteString(col.name)
+		sb.WriteString(quote)
+		sb.WriteString(" = ?")
 	}
-	tokens = append(tokens, strings.Join(values, ", "))
-	tokens = append(tokens, "WHERE ID = ?;")
-	return strings.Join(tokens, " ")
+	// Build WHERE statement.
+	sb.WriteString(" WHERE ")
+	sb.WriteString(quote)
+	sb.WriteString("id")
+	sb.WriteString(quote)
+	sb.WriteString(" = ?;")
+	return sb.String()
 }
 
 // Build argument of ptr.
@@ -69,46 +82,24 @@ func (b *updateBuilder) buildArgs(ptr any) ([]any, error) {
 	if err != nil {
 		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
 			errs.WithCause(err))
-		return []any{}, err
+		return nil, err
 	}
 	// Unmarshal msgpack.
-	var m map[string]any
-	err = msgpack.Unmarshal(blob, &m)
+	m, err := decodeToMap(blob)
 	if err != nil {
 		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
 			errs.WithCause(err),
 			errs.WithContext("msgpack", blob))
-		return []any{}, err
+		return nil, err
 	}
+	// Update timestamp.
+	m["UpdatedAt"] = time.Now().UTC()
 	// Build args.
-	quote := b.table.gari.stringQuote
 	args := make([]any, len(b.fieldNames))
 	for i, fieldName := range b.fieldNames {
 		v := m[fieldName]
-		switch tv := v.(type) {
-		case nil:
-			args[i] = "NULL"
-		case string:
-			args[i] = quote + tv + quote
-		case time.Time:
-			args[i] = quote + tv.Format("20060102 15:06:07.999999") + quote
-		case int8:
-			args[i] = strconv.FormatInt(int64(tv), 10)
-		case int16:
-			args[i] = strconv.FormatInt(int64(tv), 10)
-		case int32:
-			args[i] = strconv.FormatInt(int64(tv), 10)
-		case int64:
-			args[i] = strconv.FormatInt(tv, 10)
-		case uint16:
-			args[i] = strconv.FormatUint(uint64(tv), 10)
-		case uint32:
-			args[i] = strconv.FormatUint(uint64(tv), 10)
-		case uint64:
-			args[i] = strconv.FormatUint(tv, 10)
-		default:
-			args[i] = "ERR"
-		}
+		fmt.Printf("args[%d] field=%s value=%v(%T)\n", i, fieldName, v, v)
+		args[i] = v
 	}
 	return args, nil
 }
