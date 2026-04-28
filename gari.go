@@ -41,5 +41,15 @@ func (g *Gari) Table(name string) *TableBuilder {
 	b := TableBuilder{
 		table: newTable(g, name),
 	}
+	// Add id column.
+	b.AddInt64Column("id", func(c *Column) {
+		c.primary = true
+		c.autoIncrement = true
+		c.notNull = true
+	})
+	// Add timestamp columns.
+	b.AddTimeColumn("created_at", NotNull())
+	b.AddTimeColumn("updated_at", NotNull())
+	b.AddTimeColumn("deleted_at", DefaultNull())
 	return &b
 }
