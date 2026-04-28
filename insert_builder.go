@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -48,18 +47,34 @@ func newInsertBuilder(t *Table) *insertBuilder {
 
 // Build INSERT SQL statement.
 func (b *insertBuilder) buildQuery() string {
-	tokens := []string{
-		"INSERT", "INTO", b.table.name, "VALUES",
+	var sb strings.Builder
+	sb.WriteString("INSERT INTO ")
+	// Build table token.
+	quote := b.table.gari.columnQuote
+	sb.WriteString(quote)
+	sb.WriteString(b.table.name)
+	sb.WriteString(quote)
+	sb.WriteString(" (")
+	// Build columns token.
+	for i, fieldName := range b.fieldNames {
+		col := b.table.columns[fieldName]
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(quote)
+		sb.WriteString(col.name)
+		sb.WriteString(quote)
 	}
+	sb.WriteString(") VALUES (")
 	// Build values token.
-	values := make([]string, len(b.fieldNames))
 	for i := range b.fieldNames {
-		values[i] = "?"
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString("?")
 	}
-	valuesToken := fmt.Sprintf("(%s);",
-		strings.Join(values, ", "))
-	tokens = append(tokens, valuesToken)
-	return strings.Join(tokens, " ")
+	sb.WriteString(");")
+	return sb.String()
 }
 
 // Build argument of ptr.
@@ -72,43 +87,23 @@ func (b *insertBuilder) buildArgs(ptr any) ([]any, error) {
 		return []any{}, err
 	}
 	// Unmarshal msgpack.
-	var m map[string]any
-	err = msgpack.Unmarshal(blob, &m)
+	m, err := decodeToMap(blob)
 	if err != nil {
 		err = errs.Wrap(ErrInsertBuilderBuildArgs,
 			errs.WithCause(err),
 			errs.WithContext("msgpack", blob))
 		return []any{}, err
 	}
+	// Update timestamps.
+	ts := time.Now().UTC()
+	m["CreatedAt"] = ts
+	m["UpdatedAt"] = ts
 	// Build args.
-	quote := b.table.gari.stringQuote
 	args := make([]any, len(b.fieldNames))
 	for i, fieldName := range b.fieldNames {
 		v := m[fieldName]
-		switch tv := v.(type) {
-		case nil:
-			args[i] = "NULL"
-		case string:
-			args[i] = quote + tv + quote
-		case time.Time:
-			args[i] = quote + tv.Format("20060102 15:06:07.999999") + quote
-		case int8:
-			args[i] = strconv.FormatInt(int64(tv), 10)
-		case int16:
-			args[i] = strconv.FormatInt(int64(tv), 10)
-		case int32:
-			args[i] = strconv.FormatInt(int64(tv), 10)
-		case int64:
-			args[i] = strconv.FormatInt(tv, 10)
-		case uint16:
-			args[i] = strconv.FormatUint(uint64(tv), 10)
-		case uint32:
-			args[i] = strconv.FormatUint(uint64(tv), 10)
-		case uint64:
-			args[i] = strconv.FormatUint(tv, 10)
-		default:
-			args[i] = "ERR"
-		}
+		fmt.Printf("args[%d] field=%s value=%v(%T)\n", i, fieldName, v, v)
+		args[i] = v
 	}
 	return args, nil
 }
