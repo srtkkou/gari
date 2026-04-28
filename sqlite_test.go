@@ -11,18 +11,19 @@ import (
 
 func TestSqlite(t *testing.T) {
 	// Define struct.
-	type sample struct {
+	type testModel struct {
+		Model
 		Num  int
 		Text string
 	}
 	// Define samples table.
 	gari, err := New()
 	require.NoError(t, err)
-	table, err := gari.Table("samples").
+	table, err := gari.Table("test_models").
 		AddInt64Column("num",
 			NotNull(), DefaultInt64(0)).
 		AddStringColumn("text",
-			NotNull(), Size(255), DefaultString("default")).
+			NotNull(), Size(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
 	defer table.Close()
@@ -35,21 +36,21 @@ func TestSqlite(t *testing.T) {
 	err = table.Migrate(ctx, db)
 	require.NoError(t, err)
 	// INSERT.
-	s1 := sample{Num: 101, Text: "str1"}
-	s2 := sample{Num: 102, Text: "str2"}
-	s3 := sample{Num: 103, Text: "str3"}
-	err = table.Insert(ctx, db, &s1, &s2, &s3)
+	m1 := testModel{Num: 101, Text: "str1"}
+	m2 := testModel{Num: 102, Text: "str2"}
+	m3 := testModel{Num: 103, Text: "str3"}
+	err = table.Insert(ctx, db, &m1, &m2, &m3)
 	require.NoError(t, err)
 	// SELECT.
-	samples := make([]sample, 0)
-	err = table.Select(ctx, db, &samples).OrderAsc("num").All()
+	models := make([]testModel, 0)
+	err = table.Select(ctx, db, &models).OrderAsc("num").All()
 	require.NoError(t, err)
 	// Check result.
-	require.Equal(t, 3, len(samples))
-	require.Equal(t, 101, samples[0].Num)
-	require.Equal(t, "str1", samples[0].Text)
-	require.Equal(t, 102, samples[1].Num)
-	require.Equal(t, "str2", samples[1].Text)
-	require.Equal(t, 103, samples[2].Num)
-	require.Equal(t, "str3", samples[2].Text)
+	require.Equal(t, 3, len(models))
+	require.Equal(t, 101, models[0].Num)
+	require.Equal(t, "str1", models[0].Text)
+	require.Equal(t, 102, models[1].Num)
+	require.Equal(t, "str2", models[1].Text)
+	require.Equal(t, 103, models[2].Num)
+	require.Equal(t, "str3", models[2].Text)
 }

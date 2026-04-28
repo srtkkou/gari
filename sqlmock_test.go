@@ -10,18 +10,19 @@ import (
 
 func TestSqlmock(t *testing.T) {
 	// Define struct.
-	type sample struct {
+	type testModel struct {
+		Model
 		Num  int
 		Text string
 	}
-	// Define samples table.
+	// Define test_models table.
 	gari, err := New()
 	require.NoError(t, err)
-	table, err := gari.Table("samples").
+	table, err := gari.Table("test_models").
 		AddInt64Column("num",
 			NotNull(), DefaultInt64(0)).
 		AddStringColumn("text",
-			NotNull(), Size(255), DefaultString("default")).
+			NotNull(), Size(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
 	defer table.Close()
@@ -30,43 +31,47 @@ func TestSqlmock(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Add DDL expectation.
-	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS samples(.*)`).
+	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS test_models(.*)`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	// Add INSERT expectations.
-	preparedInsert := mock.ExpectPrepare(`INSERT INTO "samples"`)
-	preparedInsert.ExpectExec().WithArgs(101, "str1").
+	preparedInsert := mock.ExpectPrepare(`INSERT INTO "test_models"`)
+	preparedInsert.ExpectExec().
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	preparedInsert.ExpectExec().WithArgs(102, "str2").
+	preparedInsert.ExpectExec().
 		WillReturnResult(sqlmock.NewResult(0, 1))
-	preparedInsert.ExpectExec().WithArgs(103, "str3").
+	preparedInsert.ExpectExec().
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	// Add SELECT expectation.
-	rows := mock.NewRows([]string{"num", "text"}).
-		AddRow(101, "str1").
-		AddRow(102, "str2").
-		AddRow(103, "str3")
-	mock.ExpectQuery(`SELECT .* FROM "samples" .*`).
+	columns := []string{
+		"id", "created_at", "updated_at", "deleted_at",
+		"num", "text",
+	}
+	rows := mock.NewRows(columns).
+		AddRow(1, time20111213(), time20111213(), nullTime(), 101, "str1").
+		AddRow(2, time20111213(), time20111213(), nullTime(), 102, "str2").
+		AddRow(3, time20111213(), time20111213(), nullTime(), 103, "str3")
+	mock.ExpectQuery(`SELECT .* FROM "test_models" .*`).
 		WillReturnRows(rows)
 	// Migrate.
 	ctx := context.Background()
 	err = table.Migrate(ctx, db)
 	require.NoError(t, err)
 	// INSERT.
-	s1 := sample{Num: 101, Text: "str1"}
-	s2 := sample{Num: 102, Text: "str2"}
-	s3 := sample{Num: 103, Text: "str3"}
-	err = table.Insert(ctx, db, &s1, &s2, &s3)
+	m1 := testModel{Num: 101, Text: "str1"}
+	m2 := testModel{Num: 102, Text: "str2"}
+	m3 := testModel{Num: 103, Text: "str3"}
+	err = table.Insert(ctx, db, &m1, &m2, &m3)
 	require.NoError(t, err)
 	// SELECT.
-	samples := make([]sample, 0)
-	err = table.Select(ctx, db, &samples).OrderAsc("num").All()
+	models := make([]testModel, 0)
+	err = table.Select(ctx, db, &models).OrderAsc("num").All()
 	require.NoError(t, err)
 	// Check result.
-	require.Equal(t, 3, len(samples))
-	require.Equal(t, 101, samples[0].Num)
-	require.Equal(t, "str1", samples[0].Text)
-	require.Equal(t, 102, samples[1].Num)
-	require.Equal(t, "str2", samples[1].Text)
-	require.Equal(t, 103, samples[2].Num)
-	require.Equal(t, "str3", samples[2].Text)
+	require.Equal(t, 3, len(models))
+	require.Equal(t, 101, models[0].Num)
+	require.Equal(t, "str1", models[0].Text)
+	require.Equal(t, 102, models[1].Num)
+	require.Equal(t, "str2", models[1].Text)
+	require.Equal(t, 103, models[2].Num)
+	require.Equal(t, "str3", models[2].Text)
 }

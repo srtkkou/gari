@@ -6,22 +6,24 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-ozzo/ozzo-validation/v4"
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/goark/errs"
 )
 
 type (
 	// 列
 	Column struct {
-		table        *Table            // Pointer to table.
-		name         string            // Table column name.
-		fieldName    string            // Field name in struct.
-		kind         kind              // Column type.
-		size         int               // Size of column type.
-		notNull      bool              // Flag to set NOT NULL.
-		defaultValue []byte            // Default value of column.
-		rules        []validation.Rule // 検証ルール
-		err          error             // エラー
+		table         *Table            // Pointer to table.
+		name          string            // Table column name.
+		fieldName     string            // Field name in struct.
+		kind          kind              // Column type.
+		size          int               // Size of column type.
+		primary       bool              // Primary key.
+		autoIncrement bool              // Flag to set AUTOINCREMENT.
+		notNull       bool              // Flag to set NOT NULL.
+		defaultValue  []byte            // Default value of column.
+		rules         []validation.Rule // 検証ルール
+		err           error             // エラー
 		//		dbKind       sql.ColumnType    // DB上の型
 	}
 	// Option of column.
@@ -173,9 +175,16 @@ func (c *Column) ddl() (string, error) {
 	case kindString:
 		tokens = append(tokens, "TEXT")
 	case kindTime:
-		tokens = append(tokens, "TEXT")
+		tokens = append(tokens, "DATETIME")
 	case kindInt64:
 		tokens = append(tokens, "INTEGER")
+	}
+	// Primary key and auto increment.
+	if c.primary {
+		tokens = append(tokens, "PRIMARY KEY")
+		if c.autoIncrement {
+			tokens = append(tokens, "AUTOINCREMENT")
+		}
 	}
 	// Null
 	if c.notNull {

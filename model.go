@@ -6,6 +6,7 @@ import (
 )
 
 type (
+	// Base type of model.
 	Model struct {
 		ID        int
 		CreatedAt time.Time

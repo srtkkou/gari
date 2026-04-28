@@ -81,21 +81,23 @@ func (b *updateBuilder) buildArgs(ptr any) ([]any, error) {
 	if err != nil {
 		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
 			errs.WithCause(err))
-		return []any{}, err
+		return nil, err
 	}
 	// Unmarshal msgpack.
-	var m map[string]any
-	err = msgpack.Unmarshal(blob, &m)
+	m, err := decodeToMap(blob)
 	if err != nil {
 		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
 			errs.WithCause(err),
 			errs.WithContext("msgpack", blob))
-		return []any{}, err
+		return nil, err
 	}
+	// Update timestamp.
+	m["UpdatedAt"] = time.Now().UTC()
 	// Build args.
 	args := make([]any, len(b.fieldNames))
 	for i, fieldName := range b.fieldNames {
 		v := m[fieldName]
+		fmt.Printf("args[%d] field=%s value=%v(%T)\n", i, fieldName, v, v)
 		args[i] = v
 	}
 	return args, nil
