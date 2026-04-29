@@ -47,10 +47,20 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	// Check result.
 	require.Equal(t, 3, len(models))
+	require.Equal(t, 1, models[0].Id)
 	require.Equal(t, 101, models[0].Num)
 	require.Equal(t, "str1", models[0].Text)
+	require.Equal(t, 2, models[1].Id)
 	require.Equal(t, 102, models[1].Num)
 	require.Equal(t, "str2", models[1].Text)
+	require.Equal(t, 3, models[2].Id)
 	require.Equal(t, 103, models[2].Num)
 	require.Equal(t, "str3", models[2].Text)
+	// UPDATE.
+	models[1].Num = 202
+	models[1].Text = "STR2"
+	models[2].Num = 203
+	models[2].Text = "STR3"
+	err = table.Update(ctx, db, &models[1], &models[2])
+	require.NoError(t, err)
 }

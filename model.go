@@ -8,7 +8,7 @@ import (
 type (
 	// Base type of model.
 	Model struct {
-		ID        int
+		Id        int
 		CreatedAt time.Time
 		UpdatedAt time.Time
 		DeletedAt sql.NullTime

@@ -95,8 +95,9 @@ func (b *updateBuilder) buildArgs(ptr any) ([]any, error) {
 	// Update timestamp.
 	m["UpdatedAt"] = time.Now().UTC()
 	// Build args.
-	args := make([]any, len(b.fieldNames))
-	for i, fieldName := range b.fieldNames {
+	fieldNames := append(b.fieldNames, "Id")
+	args := make([]any, len(fieldNames))
+	for i, fieldName := range fieldNames {
 		v := m[fieldName]
 		fmt.Printf("args[%d] field=%s value=%v(%T)\n", i, fieldName, v, v)
 		args[i] = v
