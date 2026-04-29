@@ -63,6 +63,51 @@ func encodeNullBool(v any) ([]byte, error) {
 	}
 }
 
+// Encode string to msgpack.
+func encodeString(str string) ([]byte, error) {
+	var err error
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	err = enc.EncodeString(str)
+	if err != nil {
+		err = errs.Wrap(ErrMsgpackEncode,
+			errs.WithCause(err),
+			errs.WithContext("input", str))
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Encode time.Time to msgpack.
+func encodeTime(tm time.Time) ([]byte, error) {
+	var err error
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	err = enc.EncodeTime(tm)
+	if err != nil {
+		err = errs.Wrap(ErrMsgpackEncode,
+			errs.WithCause(err),
+			errs.WithContext("input", tm))
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Encode int64 to msgpack.
+func encodeInt64(num int64) ([]byte, error) {
+	var err error
+	var buf bytes.Buffer
+	enc := msgpack.NewEncoder(&buf)
+	err = enc.EncodeInt64(num)
+	if err != nil {
+		err = errs.Wrap(ErrMsgpackEncode,
+			errs.WithCause(err),
+			errs.WithContext("input", num))
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 // Encode NULL or string value.
 func encodeNullString(v any) ([]byte, error) {
 	var err error
@@ -160,19 +205,6 @@ func encodeNullInt64(v any) ([]byte, error) {
 			errs.WithContext("input", v))
 		return []byte{}, err
 	}
-}
-
-// Encode int64. (Internal use only)
-func encodeInt64(num int64) ([]byte, error) {
-	var err error
-	var buf bytes.Buffer
-	enc := msgpack.NewEncoder(&buf)
-	if err = enc.EncodeInt64(num); err != nil {
-		err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-			errs.WithContext("input", num))
-		return []byte{}, err
-	}
-	return buf.Bytes(), nil
 }
 
 // Decode to sql.NullBool value.

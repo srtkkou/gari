@@ -8,19 +8,29 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/goark/errs"
 	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
+	// Builder to build SELECT SQL.
 	selectBuilder struct {
-		ctx        context.Context
-		db         *sql.DB
-		from       *Table
-		ptr        any
-		cells      []*Cell
+		ctx        context.Context // Context.
+		db         *sql.DB         // Pointer to database pool.
+		from       *Table          // Main table to select from.
+		ptr        any             // Destination to store selected models.
+		cells      []*cell
+		orders     []order  // ORDER BY statements.
 		orderStmts []string // ORDER BY statements.
-		err        error
+		err        error    // Error.
+	}
+	// ORDER BY statements.
+	order struct {
+		columnName string // Column name.
+		isAsc      bool   // ASC or DESC.
+	}
+	// Interface to treat sql.Row and sql.Rows.
+	row interface {
+		Scan(dest ...any) error
 	}
 )
 
@@ -39,7 +49,8 @@ func newSelectBuilder(
 		db:         db,
 		from:       t,
 		ptr:        ptr,
-		cells:      make([]*Cell, len(t.columnNames)),
+		cells:      make([]*cell, len(t.columnNames)),
+		orders:     make([]order, 0),
 		orderStmts: make([]string, 0),
 	}
 	// Initialize cells from columns.
@@ -55,8 +66,8 @@ func (b *selectBuilder) OrderAsc(name string) *selectBuilder {
 	if b.err != nil {
 		return b
 	}
-	stmt := b.orderByStmt(name) + " ASC"
-	b.orderStmts = append(b.orderStmts, stmt)
+	order := order{columnName: name, isAsc: true}
+	b.orders = append(b.orders, order)
 	return b
 }
 
@@ -65,8 +76,8 @@ func (b *selectBuilder) OrderDesc(name string) *selectBuilder {
 	if b.err != nil {
 		return b
 	}
-	stmt := b.orderByStmt(name) + " DESC"
-	b.orderStmts = append(b.orderStmts, stmt)
+	order := order{columnName: name, isAsc: false}
+	b.orders = append(b.orders, order)
 	return b
 }
 
@@ -76,21 +87,13 @@ func (b *selectBuilder) First() error {
 		return b.err
 	}
 	// Build SQL statement.
-	query := b.selectStmt() +
-		` ORDER BY ` + strings.Join(b.orderStmts, ", ") +
-		` LIMIT 1;`
-	fmt.Printf("----First----\n")
-	fmt.Printf("--query=%s\n", query)
+	query := b.buildSelect() + " " +
+		b.buildOrderBy() + ` LIMIT 1;`
+	fmt.Printf("--SelectFirst query=%s\n", query)
 	// Execute query.
 	row := b.db.QueryRowContext(b.ctx, query)
-	err := row.Scan(b.scanArgs()...)
-	if errors.Is(err, sql.ErrNoRows) {
-		return err
-	} else if err != nil {
-		return err
-	}
-	// Build msgpack bytes.
-	blob, err := b.msgpackMapBytes()
+	// Convert result to msgpack.
+	blob, err := b.rowToMsgpack(row)
 	if err != nil {
 		return err
 	}
@@ -108,10 +111,9 @@ func (b *selectBuilder) All() error {
 		return b.err
 	}
 	// Build SQL statement.
-	query := b.selectStmt() +
-		` ORDER BY ` + strings.Join(b.orderStmts, ", ") + ";"
-	fmt.Printf("----All----\n")
-	fmt.Printf("--query=%s\n", query)
+	query := b.buildSelect() + " " +
+		b.buildOrderBy() + ";"
+	fmt.Printf("--SelectAll query=%s\n", query)
 	// Execute query.
 	rows, err := b.db.QueryContext(b.ctx, query)
 	if err != nil {
@@ -124,26 +126,19 @@ func (b *selectBuilder) All() error {
 	for rows.Next() {
 		// Count up.
 		count += 1
-		fmt.Printf("--rows.Next():count=%d\n", count)
-		// Scan row.
-		err = rows.Scan(b.scanArgs()...)
-		if err != nil {
-			fmt.Printf("--err=%v\n", err)
-			return err
-		}
-		// msgpack形式に変換
-		mapBytes, err := b.msgpackMapBytes()
+		// Convert result to msgpack.
+		blob, err := b.rowToMsgpack(rows)
 		if err != nil {
 			return err
 		}
-		buf.Write(mapBytes)
+		buf.Write(blob)
 	}
-	// msgpackバイト列に配列ヘッダをつける。
+	// Add msgpack array header.
 	arrayBytes, err := msgpackArrayHeader(count)
 	if err != nil {
 		return err
 	}
-	// msgpackの組み立て
+	// Build msgpack.
 	blob := append(arrayBytes, buf.Bytes()...)
 	fmt.Printf("msgpack=%#x\n", blob)
 	// Unmarshal model
@@ -159,8 +154,8 @@ func (b *selectBuilder) All() error {
 	return nil
 }
 
-// Build SELECT FROM statement
-func (b *selectBuilder) selectStmt() string {
+// Build SELECT FROM SQL statement
+func (b *selectBuilder) buildSelect() string {
 	var sb strings.Builder
 	quote := b.from.gari.columnQuote
 	sb.WriteString("SELECT ")
@@ -183,52 +178,61 @@ func (b *selectBuilder) selectStmt() string {
 	return sb.String()
 }
 
-// Build  ORDER BY statement.
-func (b *selectBuilder) orderByStmt(name string) string {
-	// Get column.
-	col, ok := b.from.columns[name]
-	if !ok {
-		b.err = errs.Wrap(ErrColumnNotFound, errs.WithContext("name", name))
-		return ""
-	}
-	// Build stmt.
+// Build ORDER BY SQL statement.
+func (b *selectBuilder) buildOrderBy() string {
 	var sb strings.Builder
 	quote := b.from.gari.columnQuote
-	sb.WriteString(quote)
-	sb.WriteString(b.from.name)
-	sb.WriteString(quote)
-	sb.WriteString(".")
-	sb.WriteString(quote)
-	sb.WriteString(col.name)
-	sb.WriteString(quote)
+	sb.WriteString("ORDER BY ")
+	for i, order := range b.orders {
+		// Find column in table.
+		col, ok := b.from.columns[order.columnName]
+		if !ok {
+			continue
+		}
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(quote)
+		sb.WriteString(b.from.name)
+		sb.WriteString(quote)
+		sb.WriteString(".")
+		sb.WriteString(quote)
+		sb.WriteString(col.name)
+		sb.WriteString(quote)
+		if order.isAsc {
+			sb.WriteString(" ASC")
+		} else {
+			sb.WriteString(" DESC")
+		}
+	}
 	return sb.String()
 }
 
-// Convert type of sb.cells to []any.
-func (b *selectBuilder) scanArgs() []any {
-	args := make([]any, len(b.cells))
-	for i, cell := range b.cells {
-		args[i] = cell
-	}
-	return args
-}
-
-// msgpack map bytes.
-func (b *selectBuilder) msgpackMapBytes() ([]byte, error) {
+func (b *selectBuilder) rowToMsgpack(row row) ([]byte, error) {
 	var buf bytes.Buffer
-	// Build map header.
-	headerBytes, err := msgpackMapHeader(len(b.cells))
+	// Add msgpack map header.
+	size := len(b.cells)
+	headerBytes, err := msgpackMapHeader(size)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	buf.Write(headerBytes)
-	// Write key value pair.
-	for _, cell := range b.cells {
-		keyValueBytes, err := cell.MsgpackBytes()
-		if err != nil {
-			return []byte{}, err
-		}
-		buf.Write(keyValueBytes)
+	// Scan values.
+	args := make([]any, size)
+	for i := range args {
+		args[i] = b.cells[i]
 	}
-	return buf.Bytes(), err
+	err = row.Scan(args...)
+	if err != nil {
+		return nil, err
+	}
+	// Add msgpack encoded keys and values.
+	for _, cell := range b.cells {
+		blob, err := cell.Encode()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(blob)
+	}
+	return buf.Bytes(), nil
 }

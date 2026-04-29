@@ -1,31 +1,29 @@
 package gari
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/goark/errs"
 )
 
 type (
-	// Cell
-	// Box to store DB value.
-	Cell struct {
+	// Cell to store DB value.
+	cell struct {
 		column *Column // Pointer to Column
 		value  []byte  // Encoded value
 	}
 )
 
 var (
-	ErrCellKind = errors.New("gari.ErrCellKind")
-	ErrScan     = errors.New("gari.ErrScan")
+	ErrCellScan = errors.New("gari.ErrCellScan")
 )
 
 // Create new Cell struct.
-func newCell(col *Column) *Cell {
-	c := Cell{
+func newCell(col *Column) *cell {
+	c := cell{
 		column: col,
 		value:  []byte{},
 	}
@@ -33,7 +31,7 @@ func newCell(col *Column) *Cell {
 }
 
 // String
-func (c Cell) String() string {
+func (c *cell) String() string {
 	var b strings.Builder
 	b.WriteString(`{"column":`)
 	b.WriteString(c.column.String())
@@ -41,83 +39,40 @@ func (c Cell) String() string {
 	return b.String()
 }
 
-// Attr name and value.
-func (c Cell) MsgpackBytes() ([]byte, error) {
-	blob, err := encodeNullString(c.column.fieldName)
+// Scan value into Cell struct.
+func (c *cell) Scan(value any) (err error) {
+	switch tv := value.(type) {
+	case nil:
+		c.value = msgpackNil()
+	case string:
+		c.value, err = encodeString(tv)
+	case time.Time:
+		c.value, err = encodeTime(tv)
+	case int:
+		c.value, err = encodeInt64(int64(tv))
+	case int8:
+		c.value, err = encodeInt64(int64(tv))
+	case int16:
+		c.value, err = encodeInt64(int64(tv))
+	case int32:
+		c.value, err = encodeInt64(int64(tv))
+	case int64:
+		c.value, err = encodeInt64(tv)
+	default:
+		err = errs.Wrap(ErrCellScan,
+			errs.WithContext("input", value))
+	}
+	fmt.Printf("--Cell=%v(%T) col=%s blob=%#x err=%v\n",
+		value, value, c.column.name, c.value, err)
+	return err
+}
+
+// Encode field name/value pair to msgpack.
+func (c *cell) Encode() ([]byte, error) {
+	blob, err := encodeString(c.column.fieldName)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 	blob = append(blob, c.value...)
 	return blob, nil
-}
-
-// Scan value into Cell struct.
-func (c *Cell) Scan(value any) error {
-	switch c.column.kind {
-	case kindString:
-		return c.scanNullString(value)
-	case kindTime:
-		return c.scanNullTime(value)
-	case kindInt64:
-		return c.scanNullInt64(value)
-	default:
-		return ErrCellKind
-	}
-}
-
-// Scan sql.NullString type.
-func (c *Cell) scanNullString(value any) error {
-	ns := sql.NullString{}
-	err := ns.Scan(value)
-	if err != nil {
-		err = errs.Wrap(ErrScan, errs.WithCause(err),
-			errs.WithContext("value", value))
-		return err
-	}
-	fmt.Printf("NullString:Valid=%t,String=%s\n", ns.Valid, ns.String)
-	// Store value
-	blob, err := encodeNullString(ns)
-	if err != nil {
-		return err
-	}
-	c.value = blob
-	return nil
-}
-
-// Scan sql.NullTime type.
-func (c *Cell) scanNullTime(value any) error {
-	nt := sql.NullTime{}
-	err := nt.Scan(value)
-	if err != nil {
-		err = errs.Wrap(ErrScan, errs.WithCause(err),
-			errs.WithContext("value", value))
-		return err
-	}
-	fmt.Printf("NullTime:Valid=%t,Time=%v\n", nt.Valid, nt.Time)
-	// Store value
-	blob, err := encodeNullTime(nt)
-	if err != nil {
-		return err
-	}
-	c.value = blob
-	return nil
-}
-
-// Scan sql.NullInt64 type.
-func (c *Cell) scanNullInt64(value any) error {
-	ni := sql.NullInt64{}
-	err := ni.Scan(value)
-	if err != nil {
-		err = errs.Wrap(ErrScan, errs.WithCause(err),
-			errs.WithContext("value", value))
-		return err
-	}
-	fmt.Printf("NullInt:Valid=%t,Int64=%v\n", ni.Valid, ni.Int64)
-	// Store value
-	blob, err := encodeNullInt64(ni)
-	if err != nil {
-		return err
-	}
-	c.value = blob
-	return nil
 }
