@@ -15,9 +15,15 @@ func TestSqlmock(t *testing.T) {
 		Num  int
 		Text string
 	}
-	// Define test_models table.
-	gari, err := New()
+	// Open sqlmock.
+	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
+	defer db.Close()
+	// Define test_models table.
+	gari, err := New(db)
+	require.NoError(t, err)
+	defer gari.Close()
+	// Define table.
 	table, err := gari.Table("test_models").
 		AddInt64Column("num",
 			NotNull(), DefaultInt64(0)).
@@ -26,10 +32,6 @@ func TestSqlmock(t *testing.T) {
 		Define()
 	require.NoError(t, err)
 	defer table.Close()
-	// Open sqlmock.
-	db, mock, err := sqlmock.New()
-	require.NoError(t, err)
-	defer db.Close()
 	// Add DDL expectation.
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS test_models(.*)`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
@@ -54,17 +56,17 @@ func TestSqlmock(t *testing.T) {
 		WillReturnRows(rows)
 	// Migrate.
 	ctx := context.Background()
-	err = table.Migrate(ctx, db)
+	err = table.Migrate(ctx)
 	require.NoError(t, err)
 	// INSERT.
 	m1 := testModel{Num: 101, Text: "str1"}
 	m2 := testModel{Num: 102, Text: "str2"}
 	m3 := testModel{Num: 103, Text: "str3"}
-	err = table.Insert(ctx, db, &m1, &m2, &m3)
+	err = table.Insert(ctx, &m1, &m2, &m3)
 	require.NoError(t, err)
 	// SELECT.
 	models := make([]testModel, 0)
-	err = table.Select(ctx, db, &models).OrderAsc("num").All()
+	err = table.Select(ctx, &models).OrderAsc("num").All()
 	require.NoError(t, err)
 	// Check result.
 	require.Equal(t, 3, len(models))

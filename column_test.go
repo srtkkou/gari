@@ -3,6 +3,7 @@ package gari
 import (
 	"testing"
 
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,10 +23,15 @@ func TestColumnDefaultBool(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		gari, err := New()
+		// Open sqlmock.
+		db, _, err := sqlmock.New()
 		require.NoError(t, err)
+		// Use gari.
+		g, err := New(db)
+		require.NoError(t, err)
+		defer g.Close()
 		t.Run(test.name, func(t *testing.T) {
-			table, err := gari.Table("test").
+			table, err := g.Table("test").
 				AddBoolColumn("is_ok",
 					DefaultBool(test.input)).
 				Define()

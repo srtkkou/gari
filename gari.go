@@ -1,32 +1,36 @@
 package gari
 
 import (
+	"database/sql"
 	"errors"
 
 	"github.com/goark/errs"
 )
 
 type (
-	// 設定
+	// Gari configuration.
 	Gari struct {
-		stringQuote string // 文字列のクォーテーション
-		columnQuote string // 列名のクォーテーション
+		db          *sql.DB // Pointer to database pool.
+		stringQuote string  // Quotation of strings.
+		columnQuote string  // Quotation of columns.
 	}
-	// オプション関数
+	// Option func.
 	OptionFunc func(*Gari) error
 )
 
 var (
-	// オプションエラー
 	ErrOption = errors.New("gari.ErrOption")
+	ErrClose  = errors.New("gari.ErrClose")
 )
 
 // Initialize.
-func New(fns ...OptionFunc) (*Gari, error) {
+func New(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
 	g := Gari{
+		db:          db,
 		stringQuote: `'`,
 		columnQuote: `"`,
 	}
+	// Parse options.
 	for _, fn := range fns {
 		if err := fn(&g); err != nil {
 			err = errs.Wrap(ErrOption, errs.WithCause(err))
@@ -34,6 +38,14 @@ func New(fns ...OptionFunc) (*Gari, error) {
 		}
 	}
 	return &g, nil
+}
+
+// Close connection.
+func (g *Gari) Close() error {
+	if err := g.db.Close(); err != nil {
+		return errs.Wrap(ErrClose, errs.WithCause(err))
+	}
+	return nil
 }
 
 // Start table builder sequence.

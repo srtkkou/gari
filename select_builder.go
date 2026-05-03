@@ -3,7 +3,6 @@ package gari
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,7 +14,6 @@ type (
 	// Builder to build SELECT SQL.
 	selectBuilder struct {
 		ctx        context.Context // Context.
-		db         *sql.DB         // Pointer to database pool.
 		from       *Table          // Main table to select from.
 		ptr        any             // Destination to store selected models.
 		cells      []*cell
@@ -41,12 +39,11 @@ var (
 
 // Create new selectBuilder.
 func newSelectBuilder(
-	ctx context.Context, db *sql.DB, t *Table, ptr any,
+	ctx context.Context, t *Table, ptr any,
 ) *selectBuilder {
 	// Initialize selectBuilder.
 	b := selectBuilder{
 		ctx:        ctx,
-		db:         db,
 		from:       t,
 		ptr:        ptr,
 		cells:      make([]*cell, len(t.columnNames)),
@@ -91,7 +88,8 @@ func (b *selectBuilder) First() error {
 		b.buildOrderBy() + ` LIMIT 1;`
 	fmt.Printf("--SelectFirst query=%s\n", query)
 	// Execute query.
-	row := b.db.QueryRowContext(b.ctx, query)
+	db := b.from.gari.db
+	row := db.QueryRowContext(b.ctx, query)
 	// Convert result to msgpack.
 	blob, err := b.rowToMsgpack(row)
 	if err != nil {
@@ -115,7 +113,8 @@ func (b *selectBuilder) All() error {
 		b.buildOrderBy() + ";"
 	fmt.Printf("--SelectAll query=%s\n", query)
 	// Execute query.
-	rows, err := b.db.QueryContext(b.ctx, query)
+	db := b.from.gari.db
+	rows, err := db.QueryContext(b.ctx, query)
 	if err != nil {
 		return err
 	}

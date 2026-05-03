@@ -48,14 +48,14 @@ func (t *Table) Name() string {
 
 // Build SELECT SQL statement.
 func (t *Table) Select(
-	ctx context.Context, db *sql.DB, ptr any,
+	ctx context.Context, ptr any,
 ) *selectBuilder {
-	return newSelectBuilder(ctx, db, t, ptr)
+	return newSelectBuilder(ctx, t, ptr)
 }
 
 // Execute INSERT SQL statement.
 func (t *Table) Insert(
-	ctx context.Context, db *sql.DB, ptrs ...any,
+	ctx context.Context, ptrs ...any,
 ) (err error) {
 	if len(ptrs) == 0 {
 		return errs.Wrap(ErrInsert,
@@ -66,6 +66,7 @@ func (t *Table) Insert(
 		t.insertBuilder = newInsertBuilder(t)
 	}
 	// Prepare INSERT SQL statement.
+	db := t.gari.db
 	query := t.insertBuilder.query
 	if t.preparedInsert == nil {
 		t.preparedInsert, err = db.PrepareContext(ctx, query)
@@ -107,7 +108,7 @@ func (t *Table) Insert(
 
 // Execute UPDATE SQL statement.
 func (t *Table) Update(
-	ctx context.Context, db *sql.DB, ptrs ...any,
+	ctx context.Context, ptrs ...any,
 ) (err error) {
 	if len(ptrs) == 0 {
 		return errs.Wrap(ErrUpdate,
@@ -118,6 +119,7 @@ func (t *Table) Update(
 		t.updateBuilder = newUpdateBuilder(t)
 	}
 	// Prepare UPDATE SQL statement.
+	db := t.gari.db
 	query := t.updateBuilder.query
 	if t.preparedUpdate == nil {
 		t.preparedUpdate, err = db.PrepareContext(ctx, query)
@@ -158,11 +160,12 @@ func (t *Table) Update(
 }
 
 // Execute DDL SQL to migrate table.
-func (t *Table) Migrate(ctx context.Context, db *sql.DB) error {
+func (t *Table) Migrate(ctx context.Context) error {
 	// Build DDL SQL.
 	ddl, err := newDdlBuilder(t).build()
 	fmt.Printf("MIGRATE(err=%v)\nSQL=%s\n", err, ddl)
 	// Execute query.
+	db := t.gari.db
 	_, err = db.ExecContext(ctx, ddl)
 	if err != nil {
 		return err
