@@ -20,7 +20,7 @@ func TestSqlmock(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Define test_models table.
-	gari, err := New(db)
+	gari, err := Open(db)
 	require.NoError(t, err)
 	defer gari.Close()
 	// Define table.

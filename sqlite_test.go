@@ -21,7 +21,7 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Define samples table.
-	gari, err := New(db)
+	gari, err := Open(db)
 	require.NoError(t, err)
 	defer gari.Close()
 	// Define table.

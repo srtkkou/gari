@@ -23,8 +23,8 @@ var (
 	ErrClose  = errors.New("gari.ErrClose")
 )
 
-// Initialize.
-func New(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
+// Open DB connection.
+func Open(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
 	g := Gari{
 		db:          db,
 		stringQuote: `'`,

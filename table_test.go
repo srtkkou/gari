@@ -12,7 +12,7 @@ func TestTable(t *testing.T) {
 	db, _, err := sqlmock.New()
 	require.NoError(t, err)
 	// Use gari.
-	g, err := New(db)
+	g, err := Open(db)
 	require.NoError(t, err)
 	defer g.Close()
 	// Define table.
