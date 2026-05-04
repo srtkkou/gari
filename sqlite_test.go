@@ -32,7 +32,6 @@ func TestSqlite(t *testing.T) {
 			NotNull(), Size(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
-	defer table.Close()
 	// Migrate.
 	ctx := context.Background()
 	err = table.Migrate(ctx)

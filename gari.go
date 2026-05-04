@@ -10,9 +10,11 @@ import (
 type (
 	// Gari configuration.
 	Gari struct {
-		db          *sql.DB // Pointer to database pool.
-		stringQuote string  // Quotation of strings.
-		columnQuote string  // Quotation of columns.
+		isClosed    bool     // Flag to see if db is closed.
+		db          *sql.DB  // Pointer to database pool.
+		stringQuote string   // Quotation of strings.
+		columnQuote string   // Quotation of columns.
+		tables      []*Table // Pointer to tables.
 	}
 	// Option func.
 	OptionFunc func(*Gari) error
@@ -20,15 +22,16 @@ type (
 
 var (
 	ErrOption = errors.New("gari.ErrOption")
-	ErrClose  = errors.New("gari.ErrClose")
 )
 
 // Open DB connection.
 func Open(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
 	g := Gari{
+		isClosed:    false,
 		db:          db,
 		stringQuote: `'`,
 		columnQuote: `"`,
+		tables:      make([]*Table, 0),
 	}
 	// Parse options.
 	for _, fn := range fns {
@@ -42,8 +45,17 @@ func Open(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
 
 // Close connection.
 func (g *Gari) Close() error {
-	if err := g.db.Close(); err != nil {
-		return errs.Wrap(ErrClose, errs.WithCause(err))
+	if g.isClosed {
+		return nil
+	}
+	// Close database connection.
+	defer func() {
+		g.db.Close()
+		g.isClosed = true
+	}()
+	// Close tables.
+	for _, table := range g.tables {
+		table.closeTable()
 	}
 	return nil
 }
@@ -53,6 +65,7 @@ func (g *Gari) Table(name string) *TableBuilder {
 	b := TableBuilder{
 		table: newTable(g, name),
 	}
+	g.tables = append(g.tables, b.table)
 	// Add id column.
 	b.AddInt64Column("id", func(c *Column) {
 		c.primary = true

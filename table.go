@@ -173,7 +173,8 @@ func (t *Table) Migrate(ctx context.Context) error {
 	return nil
 }
 
-func (t *Table) Close() (err error) {
+// Close prepared statements.
+func (t *Table) closeTable() (err error) {
 	if t.preparedUpdate != nil {
 		if err = t.preparedUpdate.Close(); err != nil {
 			return err

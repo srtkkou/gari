@@ -31,7 +31,6 @@ func TestSqlmock(t *testing.T) {
 			NotNull(), Size(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
-	defer table.Close()
 	// Add DDL expectation.
 	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS test_models(.*)`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
