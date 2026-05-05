@@ -6,6 +6,7 @@ type (
 	// Table builder.
 	TableBuilder struct {
 		table *Table // Pointer to table struct.
+		err   error  // Error.
 	}
 )
 
@@ -39,11 +40,8 @@ func (b *TableBuilder) AddInt64Column(
 
 // Define table.
 func (b *TableBuilder) Define() (*Table, error) {
-	for _, name := range b.table.columnNames {
-		col := b.table.columns[name]
-		if col.err != nil {
-			return nil, col.err
-		}
+	if b.err != nil {
+		return nil, b.err
 	}
 	return b.table, nil
 }
@@ -61,11 +59,24 @@ func (b *TableBuilder) MustDefine() *Table {
 func (b *TableBuilder) addColumnWithKind(
 	name string, k kind, opts []ColumnOption,
 ) *TableBuilder {
-	col := newColumn(name)
-	col.kind = k
-	for _, opt := range opts {
-		opt(col)
+	// Skip if tableBuilder has error.
+	if b.err != nil {
+		return b
 	}
+	// Create new column and set to columnBuilder.
+	col := newColumn(name)
+	cb := newColumnBuilder(col)
+	col.kind = k
+	// Parse column options.
+	for _, opt := range opts {
+		opt(cb)
+	}
+	// Add columnBuilder error to tableBuilder.
+	if cb.err != nil {
+		b.err = cb.err
+		return b
+	}
+	// Add column to table.
 	b.table.addColumn(col)
 	return b
 }

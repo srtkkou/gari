@@ -16,7 +16,7 @@ type (
 		name           string             // Table name.
 		columnNames    []string           // Column names.
 		fieldNames     []string           // Attribute names.
-		columns        map[string]*Column // Map of columns.
+		columns        map[string]*column // Map of columns.
 		insertBuilder  *insertBuilder     // INSERT builder.
 		preparedInsert *sql.Stmt          // Prepared INSERT statement.
 		updateBuilder  *updateBuilder     // UPDATE builder.
@@ -36,7 +36,7 @@ func newTable(g *Gari, name string) *Table {
 		name:        name,
 		columnNames: make([]string, 0),
 		fieldNames:  make([]string, 0),
-		columns:     make(map[string]*Column, 0),
+		columns:     make(map[string]*column, 0),
 	}
 	return &t
 }
@@ -207,14 +207,14 @@ func (t *Table) LoadTestdata(xid string) error {
 }
 */
 
-// 列の追加
-func (t *Table) addColumn(col *Column) {
-	// 列名・属性名・JSONキー名の追加
+// Add column to table
+func (t *Table) addColumn(col *column) {
+	// Add column name and field name to slice.
 	t.columnNames = append(t.columnNames, col.name)
 	t.fieldNames = append(t.fieldNames, col.fieldName)
-	// マップに追加する。
+	// Add column pointer to map.
 	t.columns[col.name] = col
 	t.columns[col.fieldName] = col
-	// テーブルへのポインタの追加
+	// Add pointer to table on column.
 	col.table = t
 }
