@@ -67,11 +67,7 @@ func (g *Gari) Table(name string) *TableBuilder {
 	}
 	g.tables = append(g.tables, b.table)
 	// Add id column.
-	b.AddInt64Column("id", func(c *Column) {
-		c.primary = true
-		c.autoIncrement = true
-		c.notNull = true
-	})
+	b.AddInt64Column("id", PrimaryKey(true), NotNull())
 	// Add timestamp columns.
 	b.AddTimeColumn("created_at", NotNull())
 	b.AddTimeColumn("updated_at", NotNull())
