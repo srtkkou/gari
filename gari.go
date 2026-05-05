@@ -10,8 +10,13 @@ import (
 type (
 	// Gari configuration.
 	Gari struct {
-		isClosed    bool     // Flag to see if db is closed.
+		Debug func(msg string, args ...any) // Debug level log func.
+		Info  func(msg string, args ...any) // Info level log func.
+		Warn  func(msg string, args ...any) // Warn level log func.
+		Error func(msg string, args ...any) // Error level log func.
+
 		db          *sql.DB  // Pointer to database pool.
+		isClosed    bool     // Flag to see if db is closed.
 		stringQuote string   // Quotation of strings.
 		columnQuote string   // Quotation of columns.
 		tables      []*Table // Pointer to tables.
@@ -73,4 +78,40 @@ func (g *Gari) Table(name string) *TableBuilder {
 	b.AddTimeColumn("updated_at", NotNull())
 	b.AddTimeColumn("deleted_at", DefaultNull())
 	return &b
+}
+
+// Output debug log.
+//
+//lint:ignore U1000 Defined for future use.
+func (g *Gari) debugLog(msg string, args ...any) {
+	if g.Debug != nil {
+		g.Debug(msg, args...)
+	}
+}
+
+// Output info log.
+//
+//lint:ignore U1000 Defined for future use.
+func (g *Gari) infoLog(msg string, args ...any) {
+	if g.Info != nil {
+		g.Info(msg, args...)
+	}
+}
+
+// Output warn log.
+//
+//lint:ignore U1000 Defined for future use.
+func (g *Gari) warnLog(msg string, args ...any) {
+	if g.Warn != nil {
+		g.Warn(msg, args...)
+	}
+}
+
+// Output error log.
+//
+//lint:ignore U1000 Defined for future use.
+func (g *Gari) errorLog(msg string, args ...any) {
+	if g.Error != nil {
+		g.Error(msg, args...)
+	}
 }
