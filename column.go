@@ -32,7 +32,7 @@ var (
 	ErrColumnDDL = errors.New("gari.ErrColumnDDL")
 )
 
-// 列の新規作成
+// Create new column.
 func newColumn(name string) *column {
 	return &column{
 		name:         name,
@@ -117,4 +117,9 @@ func (c *column) ddl() (string, error) {
 	}
 	c.ddlCache = strings.Join(tokens, " ")
 	return c.ddlCache, nil
+}
+
+// Add validation rule to column.
+func (c *column) addRule(rule validation.Rule) {
+	c.rules = append(c.rules, rule)
 }

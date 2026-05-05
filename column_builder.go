@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/goark/errs"
 )
 
@@ -60,6 +61,7 @@ func Size(size int) ColumnOption {
 func NotNull() ColumnOption {
 	return setColumnOption(func(b *columnBuilder) error {
 		b.column.notNull = true
+		b.column.addRule(validation.Required)
 		return nil
 	})
 }
