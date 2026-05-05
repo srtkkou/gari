@@ -31,36 +31,19 @@ var (
 	ErrMsgpackMapToType = errors.New("gari.ErrMsgpackMapToType")
 )
 
-// Encode NULL or bool value.
-func encodeNullBool(v any) ([]byte, error) {
+// Encode bool to msgpack.
+func encodeBool(b bool) ([]byte, error) {
 	var err error
 	var buf bytes.Buffer
 	enc := msgpack.NewEncoder(&buf)
-	switch tv := v.(type) {
-	case nil:
-		return msgpackNil(), nil
-	case bool:
-		if err := enc.EncodeBool(tv); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("input", tv))
-			return []byte{}, err
-		}
-		return buf.Bytes(), nil
-	case sql.NullBool:
-		if !tv.Valid {
-			return msgpackNil(), nil
-		}
-		if err := enc.EncodeBool(tv.Bool); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("input", tv.Bool))
-			return []byte{}, err
-		}
-		return buf.Bytes(), nil
-	default:
-		err = errs.Wrap(ErrMsgpackInputType,
-			errs.WithContext("input", v))
-		return []byte{}, err
+	err = enc.EncodeBool(b)
+	if err != nil {
+		err = errs.Wrap(ErrMsgpackEncode,
+			errs.WithCause(err),
+			errs.WithContext("input", b))
+		return nil, err
 	}
+	return buf.Bytes(), nil
 }
 
 // Encode string to msgpack.
@@ -106,105 +89,6 @@ func encodeInt64(num int64) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// Encode NULL or string value.
-func encodeNullString(v any) ([]byte, error) {
-	var err error
-	var buf bytes.Buffer
-	enc := msgpack.NewEncoder(&buf)
-	switch tv := v.(type) {
-	case nil:
-		return msgpackNil(), nil
-	case string:
-		if err = enc.EncodeString(tv); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("input", tv))
-			return []byte{}, err
-		}
-		return buf.Bytes(), nil
-	case sql.NullString:
-		if !tv.Valid {
-			return msgpackNil(), nil
-		}
-		if err = enc.EncodeString(tv.String); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("input", tv.String))
-			return []byte{}, err
-		}
-		return buf.Bytes(), nil
-	default:
-		err = errs.Wrap(ErrMsgpackInputType,
-			errs.WithContext("input", v))
-		return []byte{}, err
-	}
-}
-
-// Encode NULL or time.Time value.
-func encodeNullTime(v any) ([]byte, error) {
-	var err error
-	var buf bytes.Buffer
-	enc := msgpack.NewEncoder(&buf)
-	switch tv := v.(type) {
-	case nil:
-		return msgpackNil(), nil
-	case time.Time:
-		if err = enc.EncodeTime(tv); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("input", tv))
-			return []byte{}, err
-		}
-		return buf.Bytes(), nil
-	case sql.NullTime:
-		if !tv.Valid {
-			return msgpackNil(), nil
-		}
-		if err = enc.EncodeTime(tv.Time); err != nil {
-			err = errs.Wrap(ErrMsgpackEncode, errs.WithCause(err),
-				errs.WithContext("input", tv.Time))
-			return []byte{}, err
-		}
-		return buf.Bytes(), nil
-	default:
-		err = errs.Wrap(ErrMsgpackInputType,
-			errs.WithContext("input", v))
-		return []byte{}, err
-	}
-}
-
-// Encode NULL or int value.
-func encodeNullInt64(v any) ([]byte, error) {
-	switch tv := v.(type) {
-	case nil:
-		return msgpackNil(), nil
-	case sql.NullInt16:
-		if !tv.Valid {
-			return msgpackNil(), nil
-		}
-		return encodeInt64(int64(tv.Int16))
-	case sql.NullInt32:
-		if !tv.Valid {
-			return msgpackNil(), nil
-		}
-		return encodeInt64(int64(tv.Int32))
-	case sql.NullInt64:
-		if !tv.Valid {
-			return msgpackNil(), nil
-		}
-		return encodeInt64(tv.Int64)
-	case int:
-		return encodeInt64(int64(tv))
-	case int16:
-		return encodeInt64(int64(tv))
-	case int32:
-		return encodeInt64(int64(tv))
-	case int64:
-		return encodeInt64(tv)
-	default:
-		err := errs.Wrap(ErrMsgpackInputType,
-			errs.WithContext("input", v))
-		return []byte{}, err
-	}
 }
 
 // Decode to sql.NullBool value.
