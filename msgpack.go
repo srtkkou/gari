@@ -208,32 +208,6 @@ func splitToMap(blob []byte) (map[string]encoded, error) {
 	return m, nil
 }
 
-// Decode to map.
-func decodeToMap(blob []byte) (map[string]any, error) {
-	// Decode msgpack bytes as map.
-	r := bytes.NewReader(blob)
-	dec := msgpack.NewDecoder(r)
-	m, err := dec.DecodeMap()
-	if err != nil {
-		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
-			errs.WithContext("input", blob))
-		return nil, err
-	}
-	// Convert map values.
-	for k, v := range m {
-		switch tv := v.(type) {
-		case map[string]any:
-			// Try to convert to nullable sql types.
-			if ns, err := mapToNullString(tv); err == nil {
-				m[k] = ns
-			} else if nt, err := mapToNullTime(tv); err == nil {
-				m[k] = nt
-			}
-		}
-	}
-	return m, nil
-}
-
 // NULL in msgpack format.
 func msgpackNil() []byte {
 	return []byte{0xc0}
@@ -277,65 +251,4 @@ func msgpackMapHeader(size int) ([]byte, error) {
 		return []byte{}, err
 	}
 	return b.Bytes(), nil
-}
-
-func mapToNullString(m map[string]any) (ns sql.NullString, err error) {
-	// Decode m["Valid"] value.
-	ns.Valid, err = mapToNullable(m)
-	if err != nil {
-		return ns, err
-	}
-	// Decode m["String"] value.
-	v, ok := m["String"]
-	if !ok {
-		err = errs.Wrap(ErrMsgpackMapToType,
-			errs.WithContext("String", v))
-		return ns, err
-	}
-	ns.String, ok = v.(string)
-	if !ok {
-		err = errs.Wrap(ErrMsgpackMapToType,
-			errs.WithContext("String", v))
-		return ns, err
-	}
-	return ns, nil
-}
-
-func mapToNullTime(m map[string]any) (nt sql.NullTime, err error) {
-	// Decode m["Valid"] value.
-	nt.Valid, err = mapToNullable(m)
-	if err != nil {
-		return nt, err
-	}
-	// Decode m["Time"] value.
-	v, ok := m["Time"]
-	if !ok {
-		err = errs.Wrap(ErrMsgpackMapToType,
-			errs.WithContext("Time", v))
-		return nt, err
-	}
-	nt.Time, ok = v.(time.Time)
-	if !ok {
-		err = errs.Wrap(ErrMsgpackMapToType,
-			errs.WithContext("Time", v))
-		return nt, err
-	}
-	return nt, nil
-}
-
-func mapToNullable(m map[string]any) (valid bool, err error) {
-	// Decode m["Valid"] value.
-	v, ok := m["Valid"]
-	if !ok {
-		err = errs.Wrap(ErrMsgpackMapToType,
-			errs.WithContext("Valid", v))
-		return valid, err
-	}
-	valid, ok = v.(bool)
-	if !ok {
-		err = errs.Wrap(ErrMsgpackMapToType,
-			errs.WithContext("Valid", v))
-		return valid, err
-	}
-	return valid, nil
 }
