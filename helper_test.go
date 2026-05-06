@@ -2,6 +2,7 @@ package gari
 
 import (
 	"database/sql"
+	"testing"
 	"time"
 )
 
@@ -15,4 +16,11 @@ func time20111213() time.Time {
 	return time.Date(
 		2011, time.December, 13, 14, 15, 16, 789000000, time.UTC,
 	)
+}
+
+// Define logger.
+func tLog(t *testing.T) func(string, ...any) {
+	return func(msg string, args ...any) {
+		t.Log(append([]any{msg}, args...))
+	}
 }
