@@ -19,8 +19,12 @@ func TestSqlmock(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
-	// Define test_models table.
+	// Initialize gari.
 	gari, err := Open(db)
+	gari.Debug = tLog(t)
+	gari.Info = tLog(t)
+	gari.Warn = tLog(t)
+	gari.Error = tLog(t)
 	require.NoError(t, err)
 	defer gari.Close()
 	// Define table.
@@ -61,11 +65,20 @@ func TestSqlmock(t *testing.T) {
 	m1 := testModel{Num: 101, Text: "str1"}
 	m2 := testModel{Num: 102, Text: "str2"}
 	m3 := testModel{Num: 103, Text: "str3"}
-	err = table.Insert(ctx, &m1, &m2, &m3)
+	err = table.Insert().Values(&m1, &m2, &m3).Exec(ctx)
 	require.NoError(t, err)
 	// SELECT.
 	models := make([]testModel, 0)
-	err = table.Select(ctx, &models).OrderAsc("num").All()
+	err = table.Select().OrderAsc("num").Exec(ctx, func(r *Record) {
+		m := testModel{}
+		r.SetInt("id", &m.Id)
+		r.SetTime("created_at", &m.CreatedAt)
+		r.SetTime("updated_at", &m.UpdatedAt)
+		r.SetNullTime("deleted_at", &m.DeletedAt)
+		r.SetInt("num", &m.Num)
+		r.SetString("text", &m.Text)
+		models = append(models, m)
+	})
 	require.NoError(t, err)
 	// Check result.
 	require.Equal(t, 3, len(models))
