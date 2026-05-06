@@ -178,6 +178,36 @@ func decodeNullInt64(blob []byte) (sql.NullInt64, error) {
 	return ni, nil
 }
 
+func splitToMap(blob []byte) (map[string]encoded, error) {
+	r := bytes.NewReader(blob)
+	dec := msgpack.NewDecoder(r)
+	// Get map length.
+	size, err := dec.DecodeMapLen()
+	if err != nil {
+		err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
+			errs.WithContext("input", blob))
+		return nil, err
+	}
+	// Store raw bytes into map.
+	m := make(map[string]encoded, size)
+	for range size {
+		key, err := dec.DecodeString()
+		if err != nil {
+			err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
+				errs.WithContext("input", blob))
+			return nil, err
+		}
+		blob, err := dec.DecodeRaw()
+		if err != nil {
+			err = errs.Wrap(ErrMsgpackDecode, errs.WithCause(err),
+				errs.WithContext("input", blob))
+			return nil, err
+		}
+		m[key] = encoded(blob)
+	}
+	return m, nil
+}
+
 // Decode to map.
 func decodeToMap(blob []byte) (map[string]any, error) {
 	// Decode msgpack bytes as map.
