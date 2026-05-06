@@ -2,29 +2,20 @@ package gari
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
-
-	"github.com/goark/errs"
 )
 
 type (
 	// Table
 	Table struct {
-		gari           *Gari              // Pointer to gari config.
-		name           string             // Table name.
-		columnNames    []string           // Column names.
-		fieldNames     []string           // Attribute names.
-		columns        map[string]*column // Map of columns.
-		insertBuilder  *insertBuilder     // INSERT builder.
-		updateBuilder  *updateBuilder     // UPDATE builder.
-		preparedUpdate *sql.Stmt          // Prepared UPDATE statement.
+		gari          *Gari              // Pointer to gari config.
+		name          string             // Table name.
+		columnNames   []string           // Column names.
+		fieldNames    []string           // Attribute names.
+		columns       map[string]*column // Map of columns.
+		insertBuilder *insertBuilder     // INSERT builder.
+		updateBuilder *updateBuilder     // UPDATE builder.
 	}
-)
-
-var (
-	ErrUpdate = errors.New("gari.ErrUpdate")
 )
 
 // Create new table.
@@ -62,56 +53,13 @@ func (t *Table) Insert() *insertBuilder {
 }
 
 // Execute UPDATE SQL statement.
-func (t *Table) Update(
-	ctx context.Context, ptrs ...any,
-) (err error) {
-	if len(ptrs) == 0 {
-		return errs.Wrap(ErrUpdate,
-			errs.WithContext("sizeOfPtrs", len(ptrs)))
+func (t *Table) Update() *updateBuilder {
+	if t.updateBuilder != nil {
+		return t.updateBuilder
 	}
-	// Prepare updateBuilder.
-	if t.updateBuilder == nil {
-		t.updateBuilder = newUpdateBuilder(t)
-	}
-	// Prepare UPDATE SQL statement.
-	db := t.gari.db
-	query := t.updateBuilder.query
-	if t.preparedUpdate == nil {
-		t.preparedUpdate, err = db.PrepareContext(ctx, query)
-		if err != nil {
-			return errs.Wrap(ErrUpdate, errs.WithCause(err))
-		}
-	}
-	// Execute query for each struct.
-	for _, ptr := range ptrs {
-		// Get args,
-		args, err := t.updateBuilder.buildArgs(ptr)
-		if err != nil {
-			return errs.Wrap(ErrUpdate, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-		}
-		// Execute query.
-		result, err := t.preparedUpdate.ExecContext(ctx, args...)
-		if err != nil {
-			return errs.Wrap(ErrUpdate, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-		}
-		count, err := result.RowsAffected()
-		if err != nil {
-			return errs.Wrap(ErrUpdate, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-		}
-		if count != 1 {
-			return errs.Wrap(ErrUpdate,
-				errs.WithContext("rowsAffected", count),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-		}
-	}
-	return nil
+	t.updateBuilder = newUpdateBuilder(t)
+	t.updateBuilder.prepareStmt()
+	return t.updateBuilder
 }
 
 // Execute DDL SQL to migrate table.
@@ -133,10 +81,8 @@ func (t *Table) closeTable() (err error) {
 	if t.insertBuilder != nil {
 		t.insertBuilder.closePreparedStmt()
 	}
-	if t.preparedUpdate != nil {
-		if err = t.preparedUpdate.Close(); err != nil {
-			return err
-		}
+	if t.updateBuilder != nil {
+		t.updateBuilder.closePreparedStmt()
 	}
 	return nil
 }

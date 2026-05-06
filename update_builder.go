@@ -1,9 +1,11 @@
 package gari
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,93 +16,199 @@ import (
 type (
 	// Builder to build UPDATE SQL.
 	updateBuilder struct {
-		table      *Table   // Pointer to table.
-		fieldNames []string // Sorted field names of struct.
-		query      string   // UPDATE SQL query.
+		table    *Table    // Pointer to table.
+		columns  []*column // Slice of column pointers.
+		query    string    // UPDATE SQL query.
+		prepared *sql.Stmt // Prepared statement pointer.
+		records  []*Record // Records to update.
+		err      error     // Error.
+
+		debugLog func(string, ...any) // Shorthand for Gari.debugLog().
+		infoLog  func(string, ...any) // Shorthand for Gari.infoLog().
+		warnLog  func(string, ...any) // Shorthand for Gari.warnLog().
+		errorLog func(string, ...any) // Shorthand for Gari.errorLog().
 	}
 )
 
 var (
-	ErrUpdateBuilderBuildArgs = errors.New("gari.ErrUpdateBuilderBuildArgs")
+	ErrUpdatePrepare      = errors.New("gari.ErrUpdatePrepare")
+	ErrUpdateValuesEncode = errors.New("gari.ErrUpdateValuesEncode")
+	ErrUpdateValuesDecode = errors.New("gari.ErrUpdateValuesDecode")
+	ErrUpdateRecordsEmpty = errors.New("gari.ErrUpdateRecordsEmpty")
+	ErrUpdateExec         = errors.New("gari.ErrUpdateExec")
+	ErrUpdateRowsAffected = errors.New("gari.ErrUpdateRowsAffected")
+	ErrUpdateRowCount     = errors.New("gari.ErrUpdateRowCount")
 )
 
 // Create new updateBuilder instance.
 func newUpdateBuilder(t *Table) *updateBuilder {
 	b := updateBuilder{
-		table:      t,
-		fieldNames: make([]string, 0, len(t.columnNames)),
+		table:    t,
+		columns:  make([]*column, 0, len(t.columnNames)),
+		records:  make([]*Record, 0),
+		debugLog: t.gari.debugLog,
+		infoLog:  t.gari.infoLog,
+		warnLog:  t.gari.warnLog,
+		errorLog: t.gari.errorLog,
 	}
-	// Set field names except "id" column.
+	// Set columns except primary key column.
 	for _, name := range t.columnNames {
-		if name != "id" {
-			col := t.columns[name]
-			b.fieldNames = append(b.fieldNames, col.fieldName)
+		col := t.columns[name]
+		if !col.primary {
+			b.columns = append(b.columns, col)
 		}
 	}
-	// Sort field names.
-	sort.Strings(b.fieldNames)
 	// Build UPDATE SQL query.
 	b.query = b.buildQuery()
-	fmt.Printf("UPDATE QUERY=%s\n", b.query)
+	b.infoLog("newUpdateBuilder",
+		slog.String("query", b.query))
 	return &b
+}
+
+// Add values to update.
+func (b *updateBuilder) Values(ptrs ...any) *updateBuilder {
+	if b.err != nil {
+		return b
+	}
+	// Copy columns and add primary key column to end.
+	columns := make([]*column, 0, len(b.columns)+1)
+	columns = append(columns, b.columns...)
+	// TODO: Fix to use non-id named pkey column.
+	pkeyCol := b.table.columns["id"]
+	columns = append(columns, pkeyCol)
+	for _, ptr := range ptrs {
+		// Convert to msgpack.
+		blob, err := msgpack.Marshal(ptr)
+		if err != nil {
+			b.err = errs.Wrap(ErrUpdateValuesEncode, errs.WithCause(err),
+				errs.WithContext("ptr", ptr))
+			b.errorLog(b.err.Error())
+			return b
+		}
+		// Unmarshal msgpack to map[string]encoded.
+		m, err := splitToMap(blob)
+		if err != nil {
+			b.err = errs.Wrap(ErrUpdateValuesDecode, errs.WithCause(err),
+				errs.WithContext("ptr", ptr),
+				errs.WithContext("msgpack", blob))
+			return b
+		}
+		// Build record.
+		cells := make([]*cell, len(columns))
+		for i, col := range columns {
+			cells[i] = newCell(col)
+			cells[i].blob = m[col.fieldName]
+		}
+		r := newRecord(cells)
+		b.records = append(b.records, r)
+	}
+	return b
+}
+
+// Execute UPDATE SQL statement.
+func (b *updateBuilder) Exec(ctx context.Context) error {
+	defer func() {
+		b.records = make([]*Record, 0)
+	}()
+	// Check if error exists.
+	if b.err != nil {
+		return b.err
+	}
+	// Check if records are not empty.
+	if len(b.records) == 0 {
+		b.err = errs.Wrap(ErrUpdateRecordsEmpty,
+			errs.WithContext("query", b.query))
+		b.errorLog(b.err.Error())
+		return b.err
+	}
+	for _, r := range b.records {
+		// TODO:BEFORE UPDATE
+		// Execute prepared statement.
+		args := r.args()
+		startedAt := time.Now()
+		result, err := b.prepared.ExecContext(ctx, args...)
+		if err != nil {
+			b.err = errs.Wrap(ErrUpdateExec, errs.WithCause(err),
+				errs.WithContext("query", b.query),
+				errs.WithContext("args", args),
+				errs.WithContext("duration", time.Since(startedAt)))
+			b.errorLog(b.err.Error())
+			return b.err
+		}
+		b.infoLog("Execute UPDATE SQL.",
+			slog.String("query", b.query),
+			slog.Any("args", args),
+			slog.Duration("duration", time.Since(startedAt)))
+		// Check row count.
+		count, err := result.RowsAffected()
+		if err != nil {
+			b.err = errs.Wrap(ErrUpdateRowsAffected,
+				errs.WithCause(err),
+				errs.WithContext("query", b.query),
+				errs.WithContext("args", args))
+			b.errorLog(b.err.Error())
+			return b.err
+		}
+		if count != 1 {
+			b.err = errs.Wrap(ErrUpdateRowCount,
+				errs.WithContext("query", b.query),
+				errs.WithContext("args", args),
+				errs.WithContext("rowsAffected", count))
+			b.errorLog(b.err.Error())
+			return b.err
+		}
+		// TODO:AFTER UPDATE
+	}
+	return nil
+}
+
+// Close prepared statement.
+func (b *updateBuilder) closePreparedStmt() {
+	if b.prepared != nil {
+		b.prepared.Close()
+	}
 }
 
 // Build SQL statement.
 func (b *updateBuilder) buildQuery() string {
-	var sb strings.Builder
-	sb.WriteString("UPDATE ")
-	// Build table statement.
+	tokens := []string{"UPDATE"}
+	// Add table name.
 	quote := b.table.gari.columnQuote
-	sb.WriteString(quote)
-	sb.WriteString(b.table.name)
-	sb.WriteString(quote)
-	sb.WriteString(" SET ")
-	// Build values statement.
-	for i, fieldName := range b.fieldNames {
-		col := b.table.columns[fieldName]
-		if i > 0 {
-			sb.WriteString(", ")
+	table := fmt.Sprintf("%s%s%s", quote, b.table.name, quote)
+	tokens = append(tokens, table, "SET")
+	// Add column names and placeholders.
+	count := 0
+	for _, col := range b.columns {
+		ph := b.table.gari.placeholder(count)
+		if count < (len(b.columns) - 1) {
+			ph += ","
 		}
-		sb.WriteString(quote)
-		sb.WriteString(col.name)
-		sb.WriteString(quote)
-		sb.WriteString(" = ?")
+		tokens = append(tokens, col.name, "=", ph)
+		count++
 	}
-	// Build WHERE statement.
-	sb.WriteString(" WHERE ")
-	sb.WriteString(quote)
-	sb.WriteString("id")
-	sb.WriteString(quote)
-	sb.WriteString(" = ?;")
-	return sb.String()
+	// Add WHERE statement.
+	tokens = append(tokens, "WHERE")
+	// TODO: Change needed to use non ID column name.
+	pkey := fmt.Sprintf("%s%s%s", quote, "id", quote)
+	tokens = append(tokens, pkey, "=")
+	ph := b.table.gari.placeholder(count) + ";"
+	tokens = append(tokens, ph)
+	return strings.Join(tokens, " ")
 }
 
-// Build argument of ptr.
-func (b *updateBuilder) buildArgs(ptr any) ([]any, error) {
-	// Convert to msgpack.
-	blob, err := msgpack.Marshal(ptr)
+// Prepare UPDATE SQL statement.
+func (b *updateBuilder) prepareStmt() {
+	startedAt := time.Now()
+	var err error
+	db := b.table.gari.db
+	b.prepared, err = db.Prepare(b.query)
 	if err != nil {
-		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
-			errs.WithCause(err))
-		return nil, err
+		b.err = errs.Wrap(ErrUpdatePrepare, errs.WithCause(err),
+			errs.WithContext("query", b.query),
+			errs.WithContext("duration", time.Since(startedAt)))
+		b.errorLog(b.err.Error())
 	}
-	// Unmarshal msgpack.
-	m, err := decodeToMap(blob)
-	if err != nil {
-		err = errs.Wrap(ErrUpdateBuilderBuildArgs,
-			errs.WithCause(err),
-			errs.WithContext("msgpack", blob))
-		return nil, err
-	}
-	// Update timestamp.
-	m["UpdatedAt"] = time.Now().UTC()
-	// Build args.
-	fieldNames := append(b.fieldNames, "Id")
-	args := make([]any, len(fieldNames))
-	for i, fieldName := range fieldNames {
-		v := m[fieldName]
-		fmt.Printf("args[%d] field=%s value=%v(%T)\n", i, fieldName, v, v)
-		args[i] = v
-	}
-	return args, nil
+	b.infoLog("Prepare UPDATE SQL.",
+		slog.String("query", b.query),
+		slog.Duration("duration", time.Since(startedAt)))
 }
