@@ -2,6 +2,7 @@ package gari
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -50,6 +51,11 @@ func newColumn(name string) *column {
 func (c *column) String() string {
 	ddl, _ := c.ddl()
 	return ddl
+}
+
+// Column name with table.
+func (c *column) fullName() string {
+	return fmt.Sprintf("%s.%s", c.table.name, c.name)
 }
 
 // Build DDL SQL.
