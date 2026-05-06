@@ -15,11 +15,12 @@ type (
 		Warn  func(msg string, args ...any) // Warn level log func.
 		Error func(msg string, args ...any) // Error level log func.
 
-		db          *sql.DB  // Pointer to database pool.
-		isClosed    bool     // Flag to see if db is closed.
-		stringQuote string   // Quotation of strings.
-		columnQuote string   // Quotation of columns.
-		tables      []*Table // Pointer to tables.
+		db          *sql.DB    // Pointer to database pool.
+		isClosed    bool       // Flag to see if db is closed.
+		stringQuote string     // Quotation of strings.
+		columnQuote string     // Quotation of columns.
+		tables      []*Table   // Pointer to tables.
+		txBuilder   *txBuilder // Pointer to txBuilder.
 	}
 	// Option func.
 	OptionFunc func(*Gari) error
@@ -62,6 +63,10 @@ func (g *Gari) Close() error {
 	for _, table := range g.tables {
 		table.closeTable()
 	}
+	// Close transaction.
+	if g.txBuilder != nil {
+		g.txBuilder.Rollback()
+	}
 	return nil
 }
 
@@ -71,6 +76,7 @@ func (g *Gari) Table(name string) *TableBuilder {
 		table: newTable(g, name),
 	}
 	g.tables = append(g.tables, b.table)
+	// TODO: Remove ID/TIMESTAMP columns below.
 	// Add id column.
 	b.AddInt64Column("id", PrimaryKey(true), NotNull())
 	// Add timestamp columns.
@@ -78,6 +84,12 @@ func (g *Gari) Table(name string) *TableBuilder {
 	b.AddTimeColumn("updated_at", NotNull())
 	b.AddTimeColumn("deleted_at", DefaultNull())
 	return &b
+}
+
+// Begin transaction.
+func (g *Gari) BeginTx() *txBuilder {
+	g.txBuilder = newTxBuilder(g)
+	return g.txBuilder
 }
 
 // Get placeholder.
