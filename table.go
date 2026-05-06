@@ -18,14 +18,12 @@ type (
 		fieldNames     []string           // Attribute names.
 		columns        map[string]*column // Map of columns.
 		insertBuilder  *insertBuilder     // INSERT builder.
-		preparedInsert *sql.Stmt          // Prepared INSERT statement.
 		updateBuilder  *updateBuilder     // UPDATE builder.
 		preparedUpdate *sql.Stmt          // Prepared UPDATE statement.
 	}
 )
 
 var (
-	ErrInsert = errors.New("gari.ErrInsert")
 	ErrUpdate = errors.New("gari.ErrUpdate")
 )
 
@@ -54,56 +52,13 @@ func (t *Table) Select(
 }
 
 // Execute INSERT SQL statement.
-func (t *Table) Insert(
-	ctx context.Context, ptrs ...any,
-) (err error) {
-	if len(ptrs) == 0 {
-		return errs.Wrap(ErrInsert,
-			errs.WithContext("SizeOfPtrs", len(ptrs)))
+func (t *Table) Insert() *insertBuilder {
+	if t.insertBuilder != nil {
+		return t.insertBuilder
 	}
-	// Prepare insertBuilder.
-	if t.insertBuilder == nil {
-		t.insertBuilder = newInsertBuilder(t)
-	}
-	// Prepare INSERT SQL statement.
-	db := t.gari.db
-	query := t.insertBuilder.query
-	if t.preparedInsert == nil {
-		t.preparedInsert, err = db.PrepareContext(ctx, query)
-		if err != nil {
-			return errs.Wrap(ErrInsert, errs.WithCause(err),
-				errs.WithContext("query", query))
-		}
-	}
-	// Execute query.
-	for _, ptr := range ptrs {
-		// Build args.
-		args, err := t.insertBuilder.buildArgs(ptr)
-		if err != nil {
-			return errs.Wrap(ErrInsert, errs.WithCause(err),
-				errs.WithContext("query", query))
-		}
-		// Execute query.
-		result, err := t.preparedInsert.ExecContext(ctx, args...)
-		if err != nil {
-			return errs.Wrap(ErrInsert, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-		}
-		count, err := result.RowsAffected()
-		if err != nil {
-			return errs.Wrap(ErrInsert, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-		}
-		if count != 1 {
-			return errs.Wrap(ErrInsert, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args),
-				errs.WithContext("rowsAffected", count))
-		}
-	}
-	return nil
+	t.insertBuilder = newInsertBuilder(t)
+	t.insertBuilder.prepareStmt()
+	return t.insertBuilder
 }
 
 // Execute UPDATE SQL statement.
@@ -175,6 +130,9 @@ func (t *Table) Migrate(ctx context.Context) error {
 
 // Close prepared statements.
 func (t *Table) closeTable() (err error) {
+	if t.insertBuilder != nil {
+		t.insertBuilder.closePreparedStmt()
+	}
 	if t.preparedUpdate != nil {
 		if err = t.preparedUpdate.Close(); err != nil {
 			return err
