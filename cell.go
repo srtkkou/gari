@@ -12,8 +12,8 @@ import (
 type (
 	// Cell to store DB value.
 	cell struct {
-		column *Column // Pointer to Column
-		value  []byte  // Encoded value
+		column *column // Pointer to Column
+		blob   encoded // Encoded value
 	}
 )
 
@@ -22,10 +22,10 @@ var (
 )
 
 // Create new Cell struct.
-func newCell(col *Column) *cell {
+func newCell(col *column) *cell {
 	c := cell{
 		column: col,
-		value:  []byte{},
+		blob:   []byte{},
 	}
 	return &c
 }
@@ -43,27 +43,27 @@ func (c *cell) String() string {
 func (c *cell) Scan(value any) (err error) {
 	switch tv := value.(type) {
 	case nil:
-		c.value = msgpackNil()
+		c.blob = msgpackNil()
 	case string:
-		c.value, err = encodeString(tv)
+		c.blob, err = encodeString(tv)
 	case time.Time:
-		c.value, err = encodeTime(tv)
+		c.blob, err = encodeTime(tv)
 	case int:
-		c.value, err = encodeInt64(int64(tv))
+		c.blob, err = encodeInt64(int64(tv))
 	case int8:
-		c.value, err = encodeInt64(int64(tv))
+		c.blob, err = encodeInt64(int64(tv))
 	case int16:
-		c.value, err = encodeInt64(int64(tv))
+		c.blob, err = encodeInt64(int64(tv))
 	case int32:
-		c.value, err = encodeInt64(int64(tv))
+		c.blob, err = encodeInt64(int64(tv))
 	case int64:
-		c.value, err = encodeInt64(tv)
+		c.blob, err = encodeInt64(tv)
 	default:
 		err = errs.Wrap(ErrCellScan,
 			errs.WithContext("input", value))
 	}
 	fmt.Printf("--Cell=%v(%T) col=%s blob=%#x err=%v\n",
-		value, value, c.column.name, c.value, err)
+		value, value, c.column.name, c.blob, err)
 	return err
 }
 
@@ -73,6 +73,41 @@ func (c *cell) Encode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	blob = append(blob, c.value...)
+	blob = append(blob, c.blob...)
 	return blob, nil
+}
+
+// Convert to SQL argument value.
+func (c *cell) arg() any {
+	switch c.column.kind {
+	case kindString:
+		ns, err := decodeNullString(c.blob)
+		if err != nil {
+			return nil
+		}
+		if !ns.Valid {
+			return nil
+		}
+		return ns.String
+	case kindTime:
+		nt, err := decodeNullTime(c.blob)
+		if err != nil {
+			return nil
+		}
+		if !nt.Valid {
+			return nil
+		}
+		return nt.Time
+	case kindInt64:
+		ni, err := decodeNullInt64(c.blob)
+		if err != nil {
+			return nil
+		}
+		if !ni.Valid {
+			return nil
+		}
+		return ni.Int64
+	default:
+		return nil
+	}
 }
