@@ -80,6 +80,12 @@ func (g *Gari) Table(name string) *TableBuilder {
 	return &b
 }
 
+// Get placeholder.
+// TODO: It should return $1,$2... for postgres.
+func (g *Gari) placeholder(i int) string {
+	return "?"
+}
+
 // Output debug log.
 //
 //lint:ignore U1000 Defined for future use.
