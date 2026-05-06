@@ -3,9 +3,7 @@ package gari
 import (
 	"bytes"
 	"database/sql"
-	"encoding/binary"
 	"errors"
-	"math"
 	"slices"
 	"time"
 
@@ -15,15 +13,6 @@ import (
 
 // Msgpack encoded value bytes.
 type encoded []byte
-
-const (
-	fixArrayByte = byte(0b1001_0000)
-	array16Byte  = byte(0xdc)
-	array32Byte  = byte(0xdd)
-	fixMapByte   = byte(0b1000_0000)
-	map16Byte    = byte(0xde)
-	map32Byte    = byte(0xdf)
-)
 
 var (
 	ErrMsgpackEncode    = errors.New("gari.msgpack.ErrMsgpackEncode")
@@ -211,44 +200,4 @@ func splitToMap(blob []byte) (map[string]encoded, error) {
 // NULL in msgpack format.
 func msgpackNil() []byte {
 	return []byte{0xc0}
-}
-
-// Array header.
-func msgpackArrayHeader(size int) ([]byte, error) {
-	var b bytes.Buffer
-	if size <= 15 { // fixarray
-		headByte := fixArrayByte | byte(size)
-		b.WriteByte(headByte)
-	} else if size <= math.MaxUint16 { // array16
-		b.WriteByte(array16Byte)
-		binary.Write(&b, binary.BigEndian, uint16(size))
-	} else if size <= math.MaxUint32 { // array32
-		b.WriteByte(array32Byte)
-		binary.Write(&b, binary.BigEndian, uint32(size))
-	} else {
-		err := errs.Wrap(ErrMsgpackArraySize,
-			errs.WithContext("size", size))
-		return []byte{}, err
-	}
-	return b.Bytes(), nil
-}
-
-// Map header.
-func msgpackMapHeader(size int) ([]byte, error) {
-	var b bytes.Buffer
-	if size <= 15 { // fixmap
-		headByte := fixMapByte | byte(size)
-		b.WriteByte(headByte)
-	} else if size <= math.MaxUint16 { // map16
-		b.WriteByte(map16Byte)
-		binary.Write(&b, binary.BigEndian, uint16(size))
-	} else if size <= math.MaxUint32 { // map32
-		b.WriteByte(map32Byte)
-		binary.Write(&b, binary.BigEndian, uint32(size))
-	} else {
-		err := errs.Wrap(ErrMsgpackMapSize,
-			errs.WithContext("size", size))
-		return []byte{}, err
-	}
-	return b.Bytes(), nil
 }
