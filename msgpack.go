@@ -13,6 +13,9 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
+// Msgpack encoded value bytes.
+type encoded []byte
+
 const (
 	fixArrayByte = byte(0b1001_0000)
 	array16Byte  = byte(0xdc)
