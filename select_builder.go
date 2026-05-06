@@ -1,54 +1,60 @@
 package gari
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
-	"github.com/vmihailenco/msgpack/v5"
+	"github.com/goark/errs"
 )
 
 type (
 	// Builder to build SELECT SQL.
 	selectBuilder struct {
-		ctx        context.Context // Context.
-		from       *Table          // Main table to select from.
-		ptr        any             // Destination to store selected models.
-		cells      []*cell
-		orders     []order  // ORDER BY statements.
-		orderStmts []string // ORDER BY statements.
-		err        error    // Error.
+		from  *Table // Main table to select from.
+		cells []*cell
+		err   error // Error.
+
+		//		joins  []join  // JOIN statements.
+		orders []order // ORDER BY statements.
+		limit  int     // LIMIT statement.
+
+		debugLog func(string, ...any) // Shorthand for Gari.debugLog().
+		infoLog  func(string, ...any) // Shorthand for Gari.infoLog().
+		warnLog  func(string, ...any) // Shorthand for Gari.warnLog().
+		errorLog func(string, ...any) // Shorthand for Gari.errorLog().
 	}
+	// JOIN statements.
+	//	join struct {
+	//		table    *Table // Pointer to table.
+	//		modifier string // JOIN modifier.
+	//		on       string // ON condition.
+	//	}
 	// ORDER BY statements.
 	order struct {
 		columnName string // Column name.
 		isAsc      bool   // ASC or DESC.
 	}
-	// Interface to treat sql.Row and sql.Rows.
-	row interface {
-		Scan(dest ...any) error
-	}
 )
 
 var (
-	// Column not found from name.
+	ErrSelectExec     = errors.New("gari.ErrSelectExec")
 	ErrColumnNotFound = errors.New("ErrColumnNotFound")
 )
 
 // Create new selectBuilder.
-func newSelectBuilder(
-	ctx context.Context, t *Table, ptr any,
-) *selectBuilder {
-	// Initialize selectBuilder.
+func newSelectBuilder(t *Table) *selectBuilder {
 	b := selectBuilder{
-		ctx:        ctx,
-		from:       t,
-		ptr:        ptr,
-		cells:      make([]*cell, len(t.columnNames)),
-		orders:     make([]order, 0),
-		orderStmts: make([]string, 0),
+		from:     t,
+		cells:    make([]*cell, len(t.columnNames)),
+		orders:   make([]order, 0),
+		limit:    0,
+		debugLog: t.gari.debugLog,
+		infoLog:  t.gari.infoLog,
+		warnLog:  t.gari.warnLog,
+		errorLog: t.gari.errorLog,
 	}
 	// Initialize cells from columns.
 	for i, name := range t.columnNames {
@@ -78,73 +84,48 @@ func (b *selectBuilder) OrderDesc(name string) *selectBuilder {
 	return b
 }
 
-// Select one item.
-func (b *selectBuilder) First() error {
-	if b.err != nil {
-		return b.err
-	}
-	// Build SQL statement.
-	query := b.buildSelect() + " " +
-		b.buildOrderBy() + ` LIMIT 1;`
-	fmt.Printf("--SelectFirst query=%s\n", query)
-	// Execute query.
-	db := b.from.gari.db
-	row := db.QueryRowContext(b.ctx, query)
-	// Convert result to msgpack.
-	blob, err := b.rowToMsgpack(row)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("msgpack=%#x\n", blob)
-	// Unmarshal model.
-	err = msgpack.Unmarshal(blob, b.ptr)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (b *selectBuilder) All() error {
+// Execute SELECT SQL query.
+func (b *selectBuilder) Exec(
+	ctx context.Context, fn func(r *Record),
+) error {
 	if b.err != nil {
 		return b.err
 	}
 	// Build SQL statement.
 	query := b.buildSelect() + " " +
 		b.buildOrderBy() + ";"
-	fmt.Printf("--SelectAll query=%s\n", query)
 	// Execute query.
 	db := b.from.gari.db
-	rows, err := db.QueryContext(b.ctx, query)
+	startedAt := time.Now()
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
-		return err
+		b.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
+			errs.WithContext("query", query),
+			errs.WithContext("duration", time.Since(startedAt)))
+		b.errorLog(b.err.Error())
+		return b.err
 	}
+	b.infoLog("selectBuilder.Exec",
+		slog.String("query", query),
+		slog.Duration("duration", time.Since(startedAt)))
 	defer rows.Close()
 	// Scan rows.
-	var buf bytes.Buffer
 	count := 0
 	for rows.Next() {
 		// Count up.
 		count += 1
-		// Convert result to msgpack.
-		blob, err := b.rowToMsgpack(rows)
+		// Scan values.
+		args := make([]any, len(b.cells))
+		for i := range args {
+			args[i] = b.cells[i]
+		}
+		err = rows.Scan(args...)
 		if err != nil {
 			return err
 		}
-		buf.Write(blob)
-	}
-	// Add msgpack array header.
-	arrayBytes, err := msgpackArrayHeader(count)
-	if err != nil {
-		return err
-	}
-	// Build msgpack.
-	blob := append(arrayBytes, buf.Bytes()...)
-	fmt.Printf("msgpack=%#x\n", blob)
-	// Unmarshal model
-	err = msgpack.Unmarshal(blob, b.ptr)
-	if err != nil {
-		fmt.Printf("--UnmarshalErr=%v\n", err)
-		return err
+		// Pass Record to func.
+		r := newRecord(b.cells)
+		fn(r)
 	}
 	// Check error
 	if rows.Err() != nil {
@@ -155,6 +136,26 @@ func (b *selectBuilder) All() error {
 
 // Build SELECT FROM SQL statement
 func (b *selectBuilder) buildSelect() string {
+	/*
+		tokens := []string{"SELECT"}
+		// Columns
+		quotedTable := fmt.Sprintf("%s%s%s",
+			quote, b.from.name, quote)
+		for i, cell := range b.cells {
+			quotedColumn :=
+			alias :=
+		}
+		// Table
+		tokens = append(tokens, "FROM", quotedTable)
+		// Order
+
+		// Limit
+		if b.limit > 0 {
+			tokens = append(tokens, "LIMIT")
+			tokens = append(tokens, strconv.Itoa(b.limit))
+		}
+		return strings.Join(tokens, " ")
+	*/
 	var sb strings.Builder
 	quote := b.from.gari.columnQuote
 	sb.WriteString("SELECT ")
@@ -205,33 +206,4 @@ func (b *selectBuilder) buildOrderBy() string {
 		}
 	}
 	return sb.String()
-}
-
-func (b *selectBuilder) rowToMsgpack(row row) ([]byte, error) {
-	var buf bytes.Buffer
-	// Add msgpack map header.
-	size := len(b.cells)
-	headerBytes, err := msgpackMapHeader(size)
-	if err != nil {
-		return nil, err
-	}
-	buf.Write(headerBytes)
-	// Scan values.
-	args := make([]any, size)
-	for i := range args {
-		args[i] = b.cells[i]
-	}
-	err = row.Scan(args...)
-	if err != nil {
-		return nil, err
-	}
-	// Add msgpack encoded keys and values.
-	for _, cell := range b.cells {
-		blob, err := cell.Encode()
-		if err != nil {
-			return nil, err
-		}
-		buf.Write(blob)
-	}
-	return buf.Bytes(), nil
 }

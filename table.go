@@ -36,10 +36,8 @@ func (t *Table) Name() string {
 }
 
 // Build SELECT SQL statement.
-func (t *Table) Select(
-	ctx context.Context, ptr any,
-) *selectBuilder {
-	return newSelectBuilder(ctx, t, ptr)
+func (t *Table) Select() *selectBuilder {
+	return newSelectBuilder(t)
 }
 
 // Execute INSERT SQL statement.
