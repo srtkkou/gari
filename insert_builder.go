@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/goark/errs"
 	"github.com/vmihailenco/msgpack/v5"
@@ -30,10 +31,10 @@ type (
 )
 
 var (
-	ErrInsertRecordsEmpty = errors.New("gari.ErrInsertRecordsEmpty")
 	ErrInsertPrepare      = errors.New("gari.ErrInsertPrepare")
 	ErrInsertValuesEncode = errors.New("gari.ErrInsertValuesEncode")
 	ErrInsertValuesDecode = errors.New("gari.ErrInsertValuesDecode")
+	ErrInsertRecordsEmpty = errors.New("gari.ErrInsertRecordsEmpty")
 	ErrInsertExec         = errors.New("gari.ErrInsertExec")
 	ErrInsertRowsAffected = errors.New("gari.ErrInsertRowsAffected")
 	ErrInsertRowCount     = errors.New("gari.ErrInsertRowCount")
@@ -115,20 +116,23 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 		return b.err
 	}
 	for _, r := range b.records {
-		// TODO:BEFORE UPDATE
+		// TODO:BEFORE INSERT
 		// Execute prepared statement.
 		args := r.args()
-		b.infoLog("Execute INSERT SQL.",
-			slog.String("query", b.query),
-			slog.Any("args", args))
+		startedAt := time.Now()
 		result, err := b.prepared.ExecContext(ctx, args...)
 		if err != nil {
 			b.err = errs.Wrap(ErrInsertExec, errs.WithCause(err),
 				errs.WithContext("query", b.query),
-				errs.WithContext("args", args))
+				errs.WithContext("args", args),
+				errs.WithContext("duration", time.Since(startedAt)))
 			b.errorLog(b.err.Error())
 			return b.err
 		}
+		b.infoLog("Execute INSERT SQL.",
+			slog.String("query", b.query),
+			slog.Any("args", args),
+			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
 		count, err := result.RowsAffected()
 		if err != nil {
@@ -147,7 +151,7 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 			b.errorLog(b.err.Error())
 			return b.err
 		}
-		// TODO:AFTER UPDATE
+		// TODO:AFTER INSERT
 	}
 	return nil
 }
@@ -189,14 +193,17 @@ func (b *insertBuilder) buildQuery() string {
 
 // Prepare INSERT SQL statement.
 func (b *insertBuilder) prepareStmt() {
-	b.infoLog("Prepare INSERT SQL.",
-		slog.String("query", b.query))
 	var err error
 	db := b.table.gari.db
+	startedAt := time.Now()
 	b.prepared, err = db.Prepare(b.query)
 	if err != nil {
 		b.err = errs.Wrap(ErrInsertPrepare, errs.WithCause(err),
-			errs.WithContext("query", b.query))
+			errs.WithContext("query", b.query),
+			errs.WithContext("duration", time.Since(startedAt)))
 		b.errorLog(b.err.Error())
 	}
+	b.infoLog("Prepare INSERT SQL.",
+		slog.String("query", b.query),
+		slog.Duration("duration", time.Since(startedAt)))
 }
