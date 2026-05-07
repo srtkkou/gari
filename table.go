@@ -2,7 +2,12 @@ package gari
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"time"
+
+	"github.com/goark/errs"
 )
 
 type (
@@ -16,6 +21,10 @@ type (
 		insertBuilder *insertBuilder // INSERT builder.
 		updateBuilder *updateBuilder // UPDATE builder.
 	}
+)
+
+var (
+	ErrTableMigrate = errors.New("gari.ErrTableMigrate")
 )
 
 // Create new table.
@@ -93,10 +102,18 @@ func (t *Table) Migrate(ctx context.Context) error {
 	fmt.Printf("MIGRATE(err=%v)\nSQL=%s\n", err, ddl)
 	// Execute query.
 	db := t.gari.db
+	startedAt := time.Now()
 	_, err = db.ExecContext(ctx, ddl)
 	if err != nil {
+		err = errs.Wrap(ErrTableMigrate, errs.WithCause(err),
+			errs.WithContext("query", ddl),
+			errs.WithContext("duration", time.Since(startedAt)))
+		t.gari.errorLog(err.Error())
 		return err
 	}
+	t.gari.infoLog("Table.Migrate()",
+		slog.String("query", ddl),
+		slog.Duration("duration", time.Since(startedAt)))
 	return nil
 }
 
