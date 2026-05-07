@@ -2,7 +2,7 @@ package gari
 
 import (
 	"errors"
-	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -10,75 +10,72 @@ import (
 )
 
 type (
-	// Cell to store DB value.
-	cell struct {
+	// Value to store DB value.
+	value struct {
 		column *column // Pointer to Column
 		blob   encoded // Encoded value
+
 	}
 )
 
 var (
-	ErrCellScan = errors.New("gari.ErrCellScan")
+	ErrValueScan = errors.New("gari.ErrValueScan")
 )
 
-// Create new Cell struct.
-func newCell(col *column) *cell {
-	c := cell{
+// Create new Value struct.
+func newValue(col *column) *value {
+	v := value{
 		column: col,
 		blob:   []byte{},
 	}
-	return &c
+	return &v
 }
 
 // String
-func (c *cell) String() string {
+func (c *value) String() string {
 	var b strings.Builder
-	b.WriteString(`{"column":`)
+	b.WriteString(`{"blob":"`)
+	b.WriteString(c.column.kind)
+	b.WriteString(`", "column":`)
 	b.WriteString(c.column.String())
 	b.WriteString(`}`)
 	return b.String()
 }
 
-// Scan value into Cell struct.
-func (c *cell) Scan(value any) (err error) {
+// Scan value into Value struct.
+func (v *value) Scan(value any) (err error) {
 	switch tv := value.(type) {
 	case nil:
-		c.blob = msgpackNil()
+		v.blob = msgpackNil()
 	case string:
-		c.blob, err = encodeString(tv)
+		v.blob, err = encodeString(tv)
 	case time.Time:
-		c.blob, err = encodeTime(tv)
+		v.blob, err = encodeTime(tv)
 	case int:
-		c.blob, err = encodeInt64(int64(tv))
+		v.blob, err = encodeInt64(int64(tv))
 	case int8:
-		c.blob, err = encodeInt64(int64(tv))
+		v.blob, err = encodeInt64(int64(tv))
 	case int16:
-		c.blob, err = encodeInt64(int64(tv))
+		v.blob, err = encodeInt64(int64(tv))
 	case int32:
-		c.blob, err = encodeInt64(int64(tv))
+		v.blob, err = encodeInt64(int64(tv))
 	case int64:
-		c.blob, err = encodeInt64(tv)
+		v.blob, err = encodeInt64(tv)
 	default:
-		err = errs.Wrap(ErrCellScan,
+		err = errs.Wrap(ErrValueScan,
 			errs.WithContext("input", value))
 	}
-	fmt.Printf("--Cell=%v(%T) col=%s blob=%#x err=%v\n",
-		value, value, c.column.name, c.blob, err)
+	v.gari().debugLog("value",
+		slog.Any("input", value),
+		slog.Any("blob", v.blob),
+		slog.Any("err", err),
+		slog.String("columnName", v.column.name),
+		slog.String("kind", v.column.kind))
 	return err
 }
 
-// Encode field name/value pair to msgpack.
-func (c *cell) Encode() ([]byte, error) {
-	blob, err := encodeString(c.column.fieldName)
-	if err != nil {
-		return nil, err
-	}
-	blob = append(blob, c.blob...)
-	return blob, nil
-}
-
 // Convert to SQL argument value.
-func (c *cell) arg() any {
+func (c *value) arg() any {
 	switch c.column.kind {
 	case kindString:
 		ns, err := decodeNullString(c.blob)
@@ -110,4 +107,8 @@ func (c *cell) arg() any {
 	default:
 		return nil
 	}
+}
+
+func (v *value) gari() *Gari {
+	return v.column.table.gari
 }

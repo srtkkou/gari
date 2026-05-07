@@ -22,11 +22,6 @@ type (
 		prepared *sql.Stmt // Prepared statement pointer.
 		records  []*Record // Records to insert.
 		err      error     // Error.
-
-		debugLog func(string, ...any) // Shorthand for Gari.debugLog().
-		infoLog  func(string, ...any) // Shorthand for Gari.infoLog().
-		warnLog  func(string, ...any) // Shorthand for Gari.warnLog().
-		errorLog func(string, ...any) // Shorthand for Gari.errorLog().
 	}
 )
 
@@ -43,13 +38,9 @@ var (
 // Create new insertBuilder instance.
 func newInsertBuilder(t *Table) *insertBuilder {
 	b := insertBuilder{
-		table:    t,
-		columns:  make([]*column, 0, len(t.columnNames)),
-		records:  make([]*Record, 0),
-		debugLog: t.gari.debugLog,
-		infoLog:  t.gari.infoLog,
-		warnLog:  t.gari.warnLog,
-		errorLog: t.gari.errorLog,
+		table:   t,
+		columns: make([]*column, 0, len(t.columnNames)),
+		records: make([]*Record, 0),
 	}
 	// Set columns except primary key.
 	for _, name := range t.columnNames {
@@ -60,7 +51,7 @@ func newInsertBuilder(t *Table) *insertBuilder {
 	}
 	// Build INSERT SQL query.
 	b.query = b.buildQuery()
-	b.infoLog("newInsertBuilder",
+	b.gari().infoLog("newInsertBuilder",
 		slog.String("query", b.query))
 	return &b
 }
@@ -76,7 +67,7 @@ func (b *insertBuilder) Values(ptrs ...any) *insertBuilder {
 		if err != nil {
 			b.err = errs.Wrap(ErrInsertValuesEncode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b
 		}
 		// Unmarshal msgpack to map[string]encoded.
@@ -88,12 +79,12 @@ func (b *insertBuilder) Values(ptrs ...any) *insertBuilder {
 			return b
 		}
 		// Build record.
-		cells := make([]*cell, len(b.columns))
+		values := make([]*value, len(b.columns))
 		for i, col := range b.columns {
-			cells[i] = newCell(col)
-			cells[i].blob = m[col.fieldName]
+			values[i] = newValue(col)
+			values[i].blob = m[col.fieldName]
 		}
-		r := newRecord(cells)
+		r := newRecord(values)
 		b.records = append(b.records, r)
 	}
 	return b
@@ -112,7 +103,7 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 	if len(b.records) == 0 {
 		b.err = errs.Wrap(ErrInsertRecordsEmpty,
 			errs.WithContext("query", b.query))
-		b.errorLog(b.err.Error())
+		b.gari().errorLog(b.err.Error())
 		return b.err
 	}
 	for _, r := range b.records {
@@ -126,10 +117,10 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 				errs.WithContext("query", b.query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b.err
 		}
-		b.infoLog("Execute INSERT SQL.",
+		b.gari().infoLog("Execute INSERT SQL.",
 			slog.String("query", b.query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
@@ -140,7 +131,7 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 				errs.WithCause(err),
 				errs.WithContext("query", b.query),
 				errs.WithContext("args", args))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b.err
 		}
 		if count != 1 {
@@ -148,7 +139,7 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 				errs.WithContext("query", b.query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b.err
 		}
 		// TODO:AFTER INSERT
@@ -201,9 +192,13 @@ func (b *insertBuilder) prepareStmt() {
 		b.err = errs.Wrap(ErrInsertPrepare, errs.WithCause(err),
 			errs.WithContext("query", b.query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.errorLog(b.err.Error())
+		b.gari().errorLog(b.err.Error())
 	}
-	b.infoLog("Prepare INSERT SQL.",
+	b.gari().infoLog("Prepare INSERT SQL.",
 		slog.String("query", b.query),
 		slog.Duration("duration", time.Since(startedAt)))
+}
+
+func (b *insertBuilder) gari() *Gari {
+	return b.table.gari
 }

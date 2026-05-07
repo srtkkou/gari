@@ -22,11 +22,6 @@ type (
 		prepared *sql.Stmt // Prepared statement pointer.
 		records  []*Record // Records to update.
 		err      error     // Error.
-
-		debugLog func(string, ...any) // Shorthand for Gari.debugLog().
-		infoLog  func(string, ...any) // Shorthand for Gari.infoLog().
-		warnLog  func(string, ...any) // Shorthand for Gari.warnLog().
-		errorLog func(string, ...any) // Shorthand for Gari.errorLog().
 	}
 )
 
@@ -43,13 +38,9 @@ var (
 // Create new updateBuilder instance.
 func newUpdateBuilder(t *Table) *updateBuilder {
 	b := updateBuilder{
-		table:    t,
-		columns:  make([]*column, 0, len(t.columnNames)),
-		records:  make([]*Record, 0),
-		debugLog: t.gari.debugLog,
-		infoLog:  t.gari.infoLog,
-		warnLog:  t.gari.warnLog,
-		errorLog: t.gari.errorLog,
+		table:   t,
+		columns: make([]*column, 0, len(t.columnNames)),
+		records: make([]*Record, 0),
 	}
 	// Set columns except primary key column.
 	for _, name := range t.columnNames {
@@ -60,7 +51,7 @@ func newUpdateBuilder(t *Table) *updateBuilder {
 	}
 	// Build UPDATE SQL query.
 	b.query = b.buildQuery()
-	b.infoLog("newUpdateBuilder",
+	b.gari().infoLog("newUpdateBuilder",
 		slog.String("query", b.query))
 	return &b
 }
@@ -82,7 +73,7 @@ func (b *updateBuilder) Values(ptrs ...any) *updateBuilder {
 		if err != nil {
 			b.err = errs.Wrap(ErrUpdateValuesEncode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b
 		}
 		// Unmarshal msgpack to map[string]encoded.
@@ -91,15 +82,16 @@ func (b *updateBuilder) Values(ptrs ...any) *updateBuilder {
 			b.err = errs.Wrap(ErrUpdateValuesDecode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr),
 				errs.WithContext("msgpack", blob))
+			b.gari().errorLog(b.err.Error())
 			return b
 		}
 		// Build record.
-		cells := make([]*cell, len(columns))
+		values := make([]*value, len(columns))
 		for i, col := range columns {
-			cells[i] = newCell(col)
-			cells[i].blob = m[col.fieldName]
+			values[i] = newValue(col)
+			values[i].blob = m[col.fieldName]
 		}
-		r := newRecord(cells)
+		r := newRecord(values)
 		b.records = append(b.records, r)
 	}
 	return b
@@ -118,7 +110,7 @@ func (b *updateBuilder) Exec(ctx context.Context) error {
 	if len(b.records) == 0 {
 		b.err = errs.Wrap(ErrUpdateRecordsEmpty,
 			errs.WithContext("query", b.query))
-		b.errorLog(b.err.Error())
+		b.gari().errorLog(b.err.Error())
 		return b.err
 	}
 	for _, r := range b.records {
@@ -132,10 +124,10 @@ func (b *updateBuilder) Exec(ctx context.Context) error {
 				errs.WithContext("query", b.query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b.err
 		}
-		b.infoLog("Execute UPDATE SQL.",
+		b.gari().infoLog("Execute UPDATE SQL.",
 			slog.String("query", b.query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
@@ -146,7 +138,7 @@ func (b *updateBuilder) Exec(ctx context.Context) error {
 				errs.WithCause(err),
 				errs.WithContext("query", b.query),
 				errs.WithContext("args", args))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b.err
 		}
 		if count != 1 {
@@ -154,7 +146,7 @@ func (b *updateBuilder) Exec(ctx context.Context) error {
 				errs.WithContext("query", b.query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
-			b.errorLog(b.err.Error())
+			b.gari().errorLog(b.err.Error())
 			return b.err
 		}
 		// TODO:AFTER UPDATE
@@ -206,9 +198,13 @@ func (b *updateBuilder) prepareStmt() {
 		b.err = errs.Wrap(ErrUpdatePrepare, errs.WithCause(err),
 			errs.WithContext("query", b.query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.errorLog(b.err.Error())
+		b.gari().errorLog(b.err.Error())
 	}
-	b.infoLog("Prepare UPDATE SQL.",
+	b.gari().infoLog("Prepare UPDATE SQL.",
 		slog.String("query", b.query),
 		slog.Duration("duration", time.Since(startedAt)))
+}
+
+func (b *updateBuilder) gari() *Gari {
+	return b.table.gari
 }

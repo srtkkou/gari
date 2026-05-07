@@ -13,18 +13,13 @@ import (
 type (
 	// Builder to build SELECT SQL.
 	selectBuilder struct {
-		from  *Table // Main table to select from.
-		cells []*cell
-		err   error // Error.
+		from   *Table // Main table to select from.
+		values []*value
+		err    error // Error.
 
 		//		joins  []join  // JOIN statements.
 		orders []order // ORDER BY statements.
 		limit  int     // LIMIT statement.
-
-		debugLog func(string, ...any) // Shorthand for Gari.debugLog().
-		infoLog  func(string, ...any) // Shorthand for Gari.infoLog().
-		warnLog  func(string, ...any) // Shorthand for Gari.warnLog().
-		errorLog func(string, ...any) // Shorthand for Gari.errorLog().
 	}
 	// JOIN statements.
 	//	join struct {
@@ -47,19 +42,15 @@ var (
 // Create new selectBuilder.
 func newSelectBuilder(t *Table) *selectBuilder {
 	b := selectBuilder{
-		from:     t,
-		cells:    make([]*cell, len(t.columnNames)),
-		orders:   make([]order, 0),
-		limit:    0,
-		debugLog: t.gari.debugLog,
-		infoLog:  t.gari.infoLog,
-		warnLog:  t.gari.warnLog,
-		errorLog: t.gari.errorLog,
+		from:   t,
+		values: make([]*value, len(t.columnNames)),
+		orders: make([]order, 0),
+		limit:  0,
 	}
-	// Initialize cells from columns.
+	// Initialize values from columns.
 	for i, name := range t.columnNames {
 		col := t.columns[name]
-		b.cells[i] = newCell(col)
+		b.values[i] = newValue(col)
 	}
 	return &b
 }
@@ -102,10 +93,10 @@ func (b *selectBuilder) Exec(
 		b.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
 			errs.WithContext("query", query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.errorLog(b.err.Error())
+		b.gari().errorLog(b.err.Error())
 		return b.err
 	}
-	b.infoLog("selectBuilder.Exec",
+	b.gari().infoLog("selectBuilder.Exec",
 		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 	defer rows.Close()
@@ -115,16 +106,16 @@ func (b *selectBuilder) Exec(
 		// Count up.
 		count += 1
 		// Scan values.
-		args := make([]any, len(b.cells))
+		args := make([]any, len(b.values))
 		for i := range args {
-			args[i] = b.cells[i]
+			args[i] = b.values[i]
 		}
 		err = rows.Scan(args...)
 		if err != nil {
 			return err
 		}
 		// Pass Record to func.
-		r := newRecord(b.cells)
+		r := newRecord(b.values)
 		fn(r)
 	}
 	// Check error
@@ -141,7 +132,7 @@ func (b *selectBuilder) buildSelect() string {
 		// Columns
 		quotedTable := fmt.Sprintf("%s%s%s",
 			quote, b.from.name, quote)
-		for i, cell := range b.cells {
+		for i, value := range b.values {
 			quotedColumn :=
 			alias :=
 		}
@@ -159,7 +150,7 @@ func (b *selectBuilder) buildSelect() string {
 	var sb strings.Builder
 	quote := b.from.gari.columnQuote
 	sb.WriteString("SELECT ")
-	for i, cell := range b.cells {
+	for i, value := range b.values {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
@@ -168,7 +159,7 @@ func (b *selectBuilder) buildSelect() string {
 		sb.WriteString(quote)
 		sb.WriteString(".")
 		sb.WriteString(quote)
-		sb.WriteString(cell.column.name)
+		sb.WriteString(value.column.name)
 		sb.WriteString(quote)
 	}
 	sb.WriteString(" FROM ")
@@ -206,4 +197,8 @@ func (b *selectBuilder) buildOrderBy() string {
 		}
 	}
 	return sb.String()
+}
+
+func (b *selectBuilder) gari() *Gari {
+	return b.from.gari
 }
