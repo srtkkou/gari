@@ -162,8 +162,7 @@ func (e *updateExecutor) closePreparedStmt() {
 func (e *updateExecutor) buildQuery() string {
 	tokens := []string{"UPDATE"}
 	// Add table name.
-	table := e.gari().quoteIdentifier(e.table.name)
-	tokens = append(tokens, table, "SET")
+	tokens = append(tokens, e.table.quotedName(), "SET")
 	// Add column names and placeholders.
 	count := 0
 	for _, col := range e.columns {
@@ -171,13 +170,12 @@ func (e *updateExecutor) buildQuery() string {
 		if count < (len(e.columns) - 1) {
 			ph += ","
 		}
-		colName := e.gari().quoteIdentifier(col.name)
-		tokens = append(tokens, colName, "=", ph)
+		tokens = append(tokens, col.quotedName(), "=", ph)
 		count++
 	}
 	// Add WHERE statement.
 	tokens = append(tokens, "WHERE")
-	pkey := e.gari().quoteIdentifier(e.table.pkey.name)
+	pkey := e.table.pkey.quotedName()
 	tokens = append(tokens, pkey, "=")
 	ph := e.table.gari.placeholder(count) + ";"
 	tokens = append(tokens, ph)

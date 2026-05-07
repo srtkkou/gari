@@ -157,11 +157,10 @@ func (e *insertExecutor) closePreparedStmt() {
 func (e *insertExecutor) buildQuery() string {
 	tokens := []string{"INSERT", "INTO"}
 	// Add table name.
-	table := e.gari().quoteIdentifier(e.table.name)
-	tokens = append(tokens, table, "(")
+	tokens = append(tokens, e.table.quotedName(), "(")
 	// Add column names.
 	for i, col := range e.columns {
-		name := e.gari().quoteIdentifier(col.name)
+		name := col.quotedName()
 		if i < (len(e.columns) - 1) {
 			name += ","
 		}

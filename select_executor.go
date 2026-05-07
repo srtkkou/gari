@@ -146,26 +146,21 @@ func (e *selectExecutor) buildSelect() string {
 		return strings.Join(tokens, " ")
 	*/
 	var sb strings.Builder
-	table := e.gari().quoteIdentifier(e.from.name)
 	sb.WriteString("SELECT ")
 	for i, value := range e.values {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(table)
-		sb.WriteString(".")
-		colName := e.gari().quoteIdentifier(value.column.name)
-		sb.WriteString(colName)
+		sb.WriteString(value.column.quotedFullName())
 	}
 	sb.WriteString(" FROM ")
-	sb.WriteString(table)
+	sb.WriteString(e.from.quotedName())
 	return sb.String()
 }
 
 // Build ORDER BY SQL statement.
 func (e *selectExecutor) buildOrderBy() string {
 	var sb strings.Builder
-	table := e.gari().quoteIdentifier(e.from.name)
 	sb.WriteString("ORDER BY ")
 	for i, order := range e.orders {
 		// Find column in table.
@@ -176,10 +171,7 @@ func (e *selectExecutor) buildOrderBy() string {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
-		sb.WriteString(table)
-		sb.WriteString(".")
-		colName := e.gari().quoteIdentifier(col.name)
-		sb.WriteString(colName)
+		sb.WriteString(col.quotedFullName())
 		if order.isAsc {
 			sb.WriteString(" ASC")
 		} else {

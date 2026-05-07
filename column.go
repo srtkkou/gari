@@ -2,7 +2,6 @@ package gari
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -56,7 +55,25 @@ func (c *column) String() string {
 
 // Column name with table.
 func (c *column) fullName() string {
-	return fmt.Sprintf("%s.%s", c.table.name, c.name)
+	var sb strings.Builder
+	sb.WriteString(c.table.name)
+	sb.WriteString(".")
+	sb.WriteString(c.name)
+	return sb.String()
+}
+
+// Quoted column name.
+func (c *column) quotedName() string {
+	return c.table.gari.quoteIdentifier(c.name)
+}
+
+// Quoted full column name.
+func (c *column) quotedFullName() string {
+	var sb strings.Builder
+	sb.WriteString(c.table.quotedName())
+	sb.WriteString(".")
+	sb.WriteString(c.quotedName())
+	return sb.String()
 }
 
 // Build DDL SQL.

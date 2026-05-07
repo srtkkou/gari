@@ -170,6 +170,11 @@ func (t *Table) LoadTestdata(xid string) error {
 }
 */
 
+// Quoted table name.
+func (t *Table) quotedName() string {
+	return t.gari.quoteIdentifier(t.name)
+}
+
 // Add column to table
 func (t *Table) addColumn(col *column) {
 	t.columns = append(t.columns, col)

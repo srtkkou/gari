@@ -145,11 +145,10 @@ func (e *deleteExecutor) closePreparedStmt() {
 func (e *deleteExecutor) buildQuery() string {
 	tokens := []string{"DELETE", "FROM"}
 	// Add table name.
-	table := e.gari().quoteIdentifier(e.table.name)
-	tokens = append(tokens, table)
+	tokens = append(tokens, e.table.quotedName())
 	// Add WHERE statement.
 	tokens = append(tokens, "WHERE")
-	pkey := e.gari().quoteIdentifier(e.table.pkey.name)
+	pkey := e.table.pkey.quotedName()
 	tokens = append(tokens, pkey, "=")
 	ph := e.table.gari.placeholder(0) + ";"
 	tokens = append(tokens, ph)
