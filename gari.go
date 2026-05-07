@@ -78,13 +78,6 @@ func (g *Gari) Table(name string) *TableBuilder {
 		table: newTable(g, name),
 	}
 	g.tables = append(g.tables, b.table)
-	// TODO: Remove ID/TIMESTAMP columns below.
-	// Add id column.
-	b.AddInt64Column("id", PrimaryKey(true), NotNull())
-	// Add timestamp columns.
-	b.AddTimeColumn("created_at", NotNull())
-	b.AddTimeColumn("updated_at", NotNull())
-	b.AddTimeColumn("deleted_at", DefaultNull())
 	return &b
 }
 
