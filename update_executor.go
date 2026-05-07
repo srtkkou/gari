@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -37,7 +36,7 @@ var (
 
 // Create new updateExecutor instance.
 func newUpdateExecutor(t *Table) *updateExecutor {
-	b := updateExecutor{
+	e := updateExecutor{
 		table:   t,
 		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
@@ -47,43 +46,41 @@ func newUpdateExecutor(t *Table) *updateExecutor {
 		if col.primary {
 			continue
 		}
-		b.columns = append(b.columns, col)
+		e.columns = append(e.columns, col)
 	}
 	// Build UPDATE SQL query.
-	b.query = b.buildQuery()
-	b.gari().infoLog("newUpdateExecutor",
-		slog.String("query", b.query))
-	return &b
+	e.query = e.buildQuery()
+	return &e
 }
 
 // Add values to update.
-func (b *updateExecutor) Values(ptrs ...any) *updateExecutor {
-	if b.err != nil {
-		return b
+func (e *updateExecutor) Values(ptrs ...any) *updateExecutor {
+	if e.err != nil {
+		return e
 	}
 	// Copy columns and add primary key column to end.
-	columns := make([]*column, 0, len(b.columns)+1)
-	columns = append(columns, b.columns...)
+	columns := make([]*column, 0, len(e.columns)+1)
+	columns = append(columns, e.columns...)
 	// TODO: Fix to use non-id named pkey column.
-	pkeyCol := b.table.column("id")
+	pkeyCol := e.table.column("id")
 	columns = append(columns, pkeyCol)
 	for _, ptr := range ptrs {
 		// Convert to msgpack.
 		blob, err := msgpack.Marshal(ptr)
 		if err != nil {
-			b.err = errs.Wrap(ErrUpdateValuesEncode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrUpdateValuesEncode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			b.gari().errorLog(b.err.Error())
-			return b
+			e.gari().errorLog(e.err.Error())
+			return e
 		}
 		// Unmarshal msgpack to map[string]encoded.
 		m, err := splitToMap(blob)
 		if err != nil {
-			b.err = errs.Wrap(ErrUpdateValuesDecode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrUpdateValuesDecode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr),
 				errs.WithContext("msgpack", blob))
-			b.gari().errorLog(b.err.Error())
-			return b
+			e.gari().errorLog(e.err.Error())
+			return e
 		}
 		// Build record.
 		values := make([]*value, len(columns))
@@ -92,62 +89,62 @@ func (b *updateExecutor) Values(ptrs ...any) *updateExecutor {
 			values[i].blob = m[col.fieldName]
 		}
 		r := newRecord(values)
-		b.records = append(b.records, r)
+		e.records = append(e.records, r)
 	}
-	return b
+	return e
 }
 
 // Execute UPDATE SQL statement.
-func (b *updateExecutor) Exec(ctx context.Context) error {
+func (e *updateExecutor) Exec(ctx context.Context) error {
 	defer func() {
-		b.records = make([]*Record, 0)
+		e.records = make([]*Record, 0)
 	}()
 	// Check if error exists.
-	if b.err != nil {
-		return b.err
+	if e.err != nil {
+		return e.err
 	}
 	// Check if records are not empty.
-	if len(b.records) == 0 {
-		b.err = errs.Wrap(ErrUpdateRecordsEmpty,
-			errs.WithContext("query", b.query))
-		b.gari().errorLog(b.err.Error())
-		return b.err
+	if len(e.records) == 0 {
+		e.err = errs.Wrap(ErrUpdateRecordsEmpty,
+			errs.WithContext("query", e.query))
+		e.gari().errorLog(e.err.Error())
+		return e.err
 	}
-	for _, r := range b.records {
+	for _, r := range e.records {
 		// TODO:BEFORE UPDATE
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
-		result, err := b.prepared.ExecContext(ctx, args...)
+		result, err := e.prepared.ExecContext(ctx, args...)
 		if err != nil {
-			b.err = errs.Wrap(ErrUpdateExec, errs.WithCause(err),
-				errs.WithContext("query", b.query),
+			e.err = errs.Wrap(ErrUpdateExec, errs.WithCause(err),
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
-		b.gari().infoLog("Execute UPDATE SQL.",
-			slog.String("query", b.query),
+		e.gari().infoLog("Execute UPDATE SQL.",
+			slog.String("query", e.query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
 		count, err := result.RowsAffected()
 		if err != nil {
-			b.err = errs.Wrap(ErrUpdateRowsAffected,
+			e.err = errs.Wrap(ErrUpdateRowsAffected,
 				errs.WithCause(err),
-				errs.WithContext("query", b.query),
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
 		if count != 1 {
-			b.err = errs.Wrap(ErrUpdateRowCount,
-				errs.WithContext("query", b.query),
+			e.err = errs.Wrap(ErrUpdateRowCount,
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
 		// TODO:AFTER UPDATE
 	}
@@ -155,56 +152,54 @@ func (b *updateExecutor) Exec(ctx context.Context) error {
 }
 
 // Close prepared statement.
-func (b *updateExecutor) closePreparedStmt() {
-	if b.prepared != nil {
-		b.prepared.Close()
+func (e *updateExecutor) closePreparedStmt() {
+	if e.prepared != nil {
+		e.prepared.Close()
 	}
 }
 
 // Build SQL statement.
-func (b *updateExecutor) buildQuery() string {
+func (e *updateExecutor) buildQuery() string {
 	tokens := []string{"UPDATE"}
 	// Add table name.
-	quote := b.table.gari.columnQuote
-	table := fmt.Sprintf("%s%s%s", quote, b.table.name, quote)
+	table := e.gari().quoteIdentifier(e.table.name)
 	tokens = append(tokens, table, "SET")
 	// Add column names and placeholders.
 	count := 0
-	for _, col := range b.columns {
-		ph := b.table.gari.placeholder(count)
-		if count < (len(b.columns) - 1) {
+	for _, col := range e.columns {
+		ph := e.table.gari.placeholder(count)
+		if count < (len(e.columns) - 1) {
 			ph += ","
 		}
-		tokens = append(tokens, col.name, "=", ph)
+		colName := e.gari().quoteIdentifier(col.name)
+		tokens = append(tokens, colName, "=", ph)
 		count++
 	}
 	// Add WHERE statement.
 	tokens = append(tokens, "WHERE")
-	// TODO: Change needed to use non ID column name.
-	pkey := fmt.Sprintf("%s%s%s", quote, "id", quote)
+	pkey := e.gari().quoteIdentifier(e.table.pkey.name)
 	tokens = append(tokens, pkey, "=")
-	ph := b.table.gari.placeholder(count) + ";"
+	ph := e.table.gari.placeholder(count) + ";"
 	tokens = append(tokens, ph)
 	return strings.Join(tokens, " ")
 }
 
 // Prepare UPDATE SQL statement.
-func (b *updateExecutor) prepareStmt() {
+func (e *updateExecutor) prepareStmt() {
 	startedAt := time.Now()
 	var err error
-	db := b.table.gari.db
-	b.prepared, err = db.Prepare(b.query)
+	e.prepared, err = e.gari().db.Prepare(e.query)
 	if err != nil {
-		b.err = errs.Wrap(ErrUpdatePrepare, errs.WithCause(err),
-			errs.WithContext("query", b.query),
+		e.err = errs.Wrap(ErrUpdatePrepare, errs.WithCause(err),
+			errs.WithContext("query", e.query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.gari().errorLog(b.err.Error())
+		e.gari().errorLog(e.err.Error())
 	}
-	b.gari().infoLog("Prepare UPDATE SQL.",
-		slog.String("query", b.query),
+	e.gari().infoLog("Prepare UPDATE SQL.",
+		slog.String("query", e.query),
 		slog.Duration("duration", time.Since(startedAt)))
 }
 
-func (b *updateExecutor) gari() *Gari {
-	return b.table.gari
+func (e *updateExecutor) gari() *Gari {
+	return e.table.gari
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -146,12 +145,11 @@ func (e *deleteExecutor) closePreparedStmt() {
 func (e *deleteExecutor) buildQuery() string {
 	tokens := []string{"DELETE", "FROM"}
 	// Add table name.
-	quote := e.table.gari.columnQuote
-	table := fmt.Sprintf("%s%s%s", quote, e.table.name, quote)
+	table := e.gari().quoteIdentifier(e.table.name)
 	tokens = append(tokens, table)
 	// Add WHERE statement.
 	tokens = append(tokens, "WHERE")
-	pkey := fmt.Sprintf("%s%s%s", quote, e.table.pkey.name, quote)
+	pkey := e.gari().quoteIdentifier(e.table.pkey.name)
 	tokens = append(tokens, pkey, "=")
 	ph := e.table.gari.placeholder(0) + ";"
 	tokens = append(tokens, ph)

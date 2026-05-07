@@ -3,6 +3,7 @@ package gari
 import (
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/goark/errs"
 )
@@ -18,7 +19,7 @@ type (
 		db          *sql.DB    // Pointer to database pool.
 		isClosed    bool       // Flag to see if db is closed.
 		stringQuote string     // Quotation of strings.
-		columnQuote string     // Quotation of columns.
+		idQuote     string     // Quotation of identifiers.
 		tables      []*Table   // Pointer to tables.
 		txBuilder   *txBuilder // Pointer to txBuilder.
 	}
@@ -36,7 +37,7 @@ func Open(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
 		isClosed:    false,
 		db:          db,
 		stringQuote: `'`,
-		columnQuote: `"`,
+		idQuote:     `"`,
 		tables:      make([]*Table, 0),
 	}
 	// Parse options.
@@ -57,6 +58,7 @@ func (g *Gari) Close() error {
 	// Close database connection.
 	defer func() {
 		g.db.Close()
+		g.infoLog("sql.DB.Close()")
 		g.isClosed = true
 	}()
 	// Close tables.
@@ -90,6 +92,15 @@ func (g *Gari) Table(name string) *TableBuilder {
 func (g *Gari) BeginTx() *txBuilder {
 	g.txBuilder = newTxBuilder(g)
 	return g.txBuilder
+}
+
+// Quote identifier.
+func (g *Gari) quoteIdentifier(identifier string) string {
+	var sb strings.Builder
+	sb.WriteString(g.idQuote)
+	sb.WriteString(identifier)
+	sb.WriteString(g.idQuote)
+	return sb.String()
 }
 
 // Get placeholder.

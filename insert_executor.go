@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -158,12 +157,11 @@ func (e *insertExecutor) closePreparedStmt() {
 func (e *insertExecutor) buildQuery() string {
 	tokens := []string{"INSERT", "INTO"}
 	// Add table name.
-	quote := e.table.gari.columnQuote
-	table := fmt.Sprintf("%s%s%s", quote, e.table.name, quote)
+	table := e.gari().quoteIdentifier(e.table.name)
 	tokens = append(tokens, table, "(")
 	// Add column names.
 	for i, col := range e.columns {
-		name := fmt.Sprintf("%s%s%s", quote, col.name, quote)
+		name := e.gari().quoteIdentifier(col.name)
 		if i < (len(e.columns) - 1) {
 			name += ","
 		}
