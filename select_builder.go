@@ -43,13 +43,12 @@ var (
 func newSelectBuilder(t *Table) *selectBuilder {
 	b := selectBuilder{
 		from:   t,
-		values: make([]*value, len(t.columnNames)),
+		values: make([]*value, len(t.columns)),
 		orders: make([]order, 0),
 		limit:  0,
 	}
 	// Initialize values from columns.
-	for i, name := range t.columnNames {
-		col := t.columns[name]
+	for i, col := range t.columns {
 		b.values[i] = newValue(col)
 	}
 	return &b
@@ -176,8 +175,8 @@ func (b *selectBuilder) buildOrderBy() string {
 	sb.WriteString("ORDER BY ")
 	for i, order := range b.orders {
 		// Find column in table.
-		col, ok := b.from.columns[order.columnName]
-		if !ok {
+		col := b.from.column(order.columnName)
+		if col == nil {
 			continue
 		}
 		if i > 0 {

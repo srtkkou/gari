@@ -17,7 +17,7 @@ type (
 	// Builder to build INSERT SQL.
 	insertBuilder struct {
 		table    *Table    // Pointer to table.
-		columns  []*column // Slice of column pointers.
+		columns  []*column // Slice of columns except primary key.
 		query    string    // INSERT SQL query.
 		prepared *sql.Stmt // Prepared statement pointer.
 		records  []*Record // Records to insert.
@@ -39,20 +39,19 @@ var (
 func newInsertBuilder(t *Table) *insertBuilder {
 	b := insertBuilder{
 		table:   t,
-		columns: make([]*column, 0, len(t.columnNames)),
+		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
 	}
-	// Set columns except primary key.
-	for _, name := range t.columnNames {
-		col := t.columns[name]
-		if !col.primary {
-			b.columns = append(b.columns, col)
+	// Initialize columns.
+	for _, col := range t.columns {
+		// Skip primary key.
+		if col.primary {
+			continue
 		}
+		b.columns = append(b.columns, col)
 	}
 	// Build INSERT SQL query.
 	b.query = b.buildQuery()
-	b.gari().infoLog("newInsertBuilder",
-		slog.String("query", b.query))
 	return &b
 }
 
@@ -151,6 +150,7 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 func (b *insertBuilder) closePreparedStmt() {
 	if b.prepared != nil {
 		b.prepared.Close()
+		b.gari().infoLog("insertBuilder.closePreparedStmt()")
 	}
 }
 
@@ -179,7 +179,10 @@ func (b *insertBuilder) buildQuery() string {
 		tokens = append(tokens, ph)
 	}
 	tokens = append(tokens, ");")
-	return strings.Join(tokens, " ")
+	query := strings.Join(tokens, " ")
+	b.gari().debugLog("insertBuilder.buildQuery()",
+		slog.String("query", query))
+	return query
 }
 
 // Prepare INSERT SQL statement.
@@ -194,7 +197,7 @@ func (b *insertBuilder) prepareStmt() {
 			errs.WithContext("duration", time.Since(startedAt)))
 		b.gari().errorLog(b.err.Error())
 	}
-	b.gari().infoLog("Prepare INSERT SQL.",
+	b.gari().infoLog("insertBuilder.prepareStmt()",
 		slog.String("query", b.query),
 		slog.Duration("duration", time.Since(startedAt)))
 }

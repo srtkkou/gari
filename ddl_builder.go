@@ -2,6 +2,7 @@ package gari
 
 import (
 	"errors"
+	"log/slog"
 	"strings"
 
 	"github.com/goark/errs"
@@ -29,25 +30,32 @@ func newDdlBuilder(t *Table) *ddlBuilder {
 // Build DDL SQL.
 func (b *ddlBuilder) build() (string, error) {
 	tokens := make([]string, 0)
-	tokens = append(tokens, "CREATE TABLE")
-	tokens = append(tokens, "IF NOT EXISTS")
+	tokens = append(tokens, "CREATE", "TABLE")
+	tokens = append(tokens, "IF", "NOT", "EXISTS")
 	tokens = append(tokens, b.table.name+"(")
-	for i, name := range b.table.columnNames {
+	for i, col := range b.table.columns {
 		// Add column DDL token.
-		col := b.table.columns[name]
 		token, err := col.ddl()
 		if err != nil {
 			err = errs.Wrap(ErrDDLBuild, errs.WithCause(err),
-				errs.WithContext("table", b.table.name))
+				errs.WithContext("table", b.table.name),
+				errs.WithContext("column", col.String()))
+			b.gari().errorLog(err.Error())
 			return "", err
 		}
 		// Add comma.
-		if i < (len(b.table.columnNames) - 1) {
+		if i < (len(b.table.columns) - 1) {
 			token += ","
 		}
 		tokens = append(tokens, token)
 	}
 	tokens = append(tokens, ")")
 	ddl := strings.Join(tokens, " ") + ";"
+	b.gari().infoLog("ddlBuilder.build()",
+		slog.String("SQL", ddl))
 	return ddl, nil
+}
+
+func (b *ddlBuilder) gari() *Gari {
+	return b.table.gari
 }

@@ -8,24 +8,23 @@ import (
 type (
 	// Table
 	Table struct {
-		gari          *Gari              // Pointer to gari config.
-		name          string             // Table name.
-		columnNames   []string           // Column names.
-		fieldNames    []string           // Attribute names.
-		columns       map[string]*column // Map of columns.
-		insertBuilder *insertBuilder     // INSERT builder.
-		updateBuilder *updateBuilder     // UPDATE builder.
+		gari      *Gari              // Pointer to gari config.
+		name      string             // Table name.
+		columns   []*column          // Slice of pointer to columns.
+		columnMap map[string]*column // Map of columns.
+		//pkey          *column            // Pointer to PRIMARY KEY column.
+		insertBuilder *insertBuilder // INSERT builder.
+		updateBuilder *updateBuilder // UPDATE builder.
 	}
 )
 
 // Create new table.
 func newTable(g *Gari, name string) *Table {
 	t := Table{
-		gari:        g,
-		name:        name,
-		columnNames: make([]string, 0),
-		fieldNames:  make([]string, 0),
-		columns:     make(map[string]*column, 0),
+		gari:      g,
+		name:      name,
+		columns:   make([]*column, 0),
+		columnMap: make(map[string]*column, 0),
 	}
 	return &t
 }
@@ -33,6 +32,33 @@ func newTable(g *Gari, name string) *Table {
 // Table name.
 func (t *Table) Name() string {
 	return t.name
+}
+
+// Column names.
+func (t *Table) ColumnNames() []string {
+	names := make([]string, len(t.columns))
+	for i, col := range t.columns {
+		names[i] = col.name
+	}
+	return names
+}
+
+// Column names with table name.
+func (t *Table) FullColumnNames() []string {
+	names := make([]string, len(t.columns))
+	for i, col := range t.columns {
+		names[i] = fmt.Sprintf("%s.%s", t.name, col.name)
+	}
+	return names
+}
+
+// Struct field names.
+func (t *Table) FieldNames() []string {
+	names := make([]string, len(t.columns))
+	for i, col := range t.columns {
+		names[i] = col.fieldName
+	}
+	return names
 }
 
 // Build SELECT SQL statement.
@@ -90,7 +116,7 @@ func (t *Table) closeTable() (err error) {
 func (t *Table) DriverValues() []driver.Value {
 	dbMap := t.toDbMap()
 	values := make([]driver.Value, 0, len(dbMap))
-	for _, column := range t.schema.columns {
+	for _, column := range t.schema.columnMap {
 		v := dbMap[column]
 		if value, ok := v.(driver.Value); ok {
 			values = append(values, value)
@@ -111,12 +137,15 @@ func (t *Table) LoadTestdata(xid string) error {
 
 // Add column to table
 func (t *Table) addColumn(col *column) {
-	// Add column name and field name to slice.
-	t.columnNames = append(t.columnNames, col.name)
-	t.fieldNames = append(t.fieldNames, col.fieldName)
+	t.columns = append(t.columns, col)
 	// Add column pointer to map.
-	t.columns[col.name] = col
-	t.columns[col.fieldName] = col
+	t.columnMap[col.name] = col
+	t.columnMap[col.fieldName] = col
 	// Add pointer to table on column.
 	col.table = t
+}
+
+// Get column by column name or field name.
+func (t *Table) column(name string) *column {
+	return t.columnMap[name]
 }

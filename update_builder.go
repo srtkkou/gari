@@ -39,15 +39,15 @@ var (
 func newUpdateBuilder(t *Table) *updateBuilder {
 	b := updateBuilder{
 		table:   t,
-		columns: make([]*column, 0, len(t.columnNames)),
+		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
 	}
 	// Set columns except primary key column.
-	for _, name := range t.columnNames {
-		col := t.columns[name]
-		if !col.primary {
-			b.columns = append(b.columns, col)
+	for _, col := range t.columns {
+		if col.primary {
+			continue
 		}
+		b.columns = append(b.columns, col)
 	}
 	// Build UPDATE SQL query.
 	b.query = b.buildQuery()
@@ -65,7 +65,7 @@ func (b *updateBuilder) Values(ptrs ...any) *updateBuilder {
 	columns := make([]*column, 0, len(b.columns)+1)
 	columns = append(columns, b.columns...)
 	// TODO: Fix to use non-id named pkey column.
-	pkeyCol := b.table.columns["id"]
+	pkeyCol := b.table.column("id")
 	columns = append(columns, pkeyCol)
 	for _, ptr := range ptrs {
 		// Convert to msgpack.

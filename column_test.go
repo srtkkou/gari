@@ -36,7 +36,8 @@ func TestColumnDefaultBool(t *testing.T) {
 					DefaultBool(test.input)).
 				Define()
 			require.NoError(t, err)
-			col := table.columns["is_ok"]
+			col := table.column("is_ok")
+			require.NotNil(t, col)
 			require.NotEmpty(t, col.defaultValue)
 		})
 	}
