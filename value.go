@@ -14,7 +14,6 @@ type (
 	value struct {
 		column *column // Pointer to Column
 		blob   encoded // Encoded value
-
 	}
 )
 
@@ -65,7 +64,7 @@ func (v *value) Scan(value any) (err error) {
 		err = errs.Wrap(ErrValueScan,
 			errs.WithContext("input", value))
 	}
-	v.gari().debugLog("value",
+	v.gari().debugLog("value.Scan()",
 		slog.Any("input", value),
 		slog.Any("blob", v.blob),
 		slog.Any("err", err),
@@ -75,38 +74,36 @@ func (v *value) Scan(value any) (err error) {
 }
 
 // Convert to SQL argument value.
-func (c *value) arg() any {
-	switch c.column.kind {
+func (v *value) arg() (result any) {
+	result = nil
+	switch v.column.kind {
+	case kindBool:
+		nb, err := decodeNullBool(v.blob)
+		if err == nil && nb.Valid {
+			result = nb.Bool
+		}
 	case kindString:
-		ns, err := decodeNullString(c.blob)
-		if err != nil {
-			return nil
+		ns, err := decodeNullString(v.blob)
+		if err == nil && ns.Valid {
+			result = ns.String
 		}
-		if !ns.Valid {
-			return nil
-		}
-		return ns.String
 	case kindTime:
-		nt, err := decodeNullTime(c.blob)
-		if err != nil {
-			return nil
+		nt, err := decodeNullTime(v.blob)
+		if err == nil && nt.Valid {
+			result = nt.Time
 		}
-		if !nt.Valid {
-			return nil
-		}
-		return nt.Time
 	case kindInt64:
-		ni, err := decodeNullInt64(c.blob)
-		if err != nil {
-			return nil
+		ni, err := decodeNullInt64(v.blob)
+		if err == nil && ni.Valid {
+			result = ni.Int64
 		}
-		if !ni.Valid {
-			return nil
-		}
-		return ni.Int64
-	default:
-		return nil
 	}
+	v.gari().debugLog("value.arg()",
+		slog.Any("blob", v.blob),
+		slog.Any("result", result),
+		slog.String("columnName", v.column.name),
+		slog.String("kind", v.column.kind))
+	return result
 }
 
 func (v *value) gari() *Gari {
