@@ -1,7 +1,5 @@
 package gari
 
-import ()
-
 type (
 	// Table builder.
 	TableBuilder struct {
@@ -64,7 +62,7 @@ func (b *TableBuilder) addColumnWithKind(
 		return b
 	}
 	// Create new column and set to columnBuilder.
-	col := newColumn(name)
+	col := newColumn(b.table, name)
 	cb := newColumnBuilder(col)
 	col.kind = k
 	// Parse column options.

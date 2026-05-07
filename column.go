@@ -34,8 +34,9 @@ var (
 )
 
 // Create new column.
-func newColumn(name string) *column {
+func newColumn(t *Table, name string) *column {
 	return &column{
+		table:        t,
 		name:         name,
 		fieldName:    snakeToUpperCamelCase(name),
 		kind:         "",

@@ -141,8 +141,6 @@ func (t *Table) addColumn(col *column) {
 	// Add column pointer to map.
 	t.columnMap[col.name] = col
 	t.columnMap[col.fieldName] = col
-	// Add pointer to table on column.
-	col.table = t
 }
 
 // Get column by column name or field name.

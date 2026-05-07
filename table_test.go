@@ -17,7 +17,7 @@ func TestTable(t *testing.T) {
 	defer g.Close()
 	// Define table.
 	tb := newTable(g, "users")
-	idCol := newColumn("id")
+	idCol := newColumn(tb, "id")
 	idCol.kind = kindString
 	tb.columns = []*column{idCol}
 	tb.columnMap[idCol.name] = idCol
