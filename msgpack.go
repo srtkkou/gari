@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/goark/errs"
@@ -200,4 +202,20 @@ func splitToMap(blob []byte) (map[string]encoded, error) {
 // NULL in msgpack format.
 func msgpackNil() []byte {
 	return []byte{0xc0}
+}
+
+// Stringify encoded bytes.
+func (e encoded) String() string {
+	var sb strings.Builder
+	sb.WriteString("0x")
+	for _, b := range e {
+		str := strconv.FormatInt(int64(b), 16)
+		if len(str) == 2 {
+			sb.WriteString(str)
+		} else {
+			sb.WriteString("0")
+			sb.WriteString(str)
+		}
+	}
+	return sb.String()
 }
