@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ type (
 
 		//		joins  []join  // JOIN statements.
 		orders []order // ORDER BY statements.
+		offset int     // OFFSET statement.
 		limit  int     // LIMIT statement.
 	}
 	// JOIN statements.
@@ -29,14 +31,14 @@ type (
 	//	}
 	// ORDER BY statements.
 	order struct {
-		columnName string // Column name.
-		isAsc      bool   // ASC or DESC.
+		column *column // Column.
+		isAsc  bool    // ASC or DESC.
 	}
 )
 
 var (
-	ErrSelectExec     = errors.New("gari.ErrSelectExec")
-	ErrColumnNotFound = errors.New("ErrColumnNotFound")
+	ErrOrderColumnNotFound = errors.New("ErrOrderColumnNotFound")
+	ErrSelectExec          = errors.New("gari.ErrSelectExec")
 )
 
 // Create new selectExecutor.
@@ -45,7 +47,8 @@ func newSelectExecutor(t *Table) *selectExecutor {
 		from:   t,
 		values: make([]*value, len(t.columns)),
 		orders: make([]order, 0),
-		limit:  0,
+		offset: -1,
+		limit:  -1,
 	}
 	// Initialize values from columns.
 	for i, col := range t.columns {
@@ -56,22 +59,12 @@ func newSelectExecutor(t *Table) *selectExecutor {
 
 // Add ORDER BY ASC statement.
 func (e *selectExecutor) OrderAsc(name string) *selectExecutor {
-	if e.err != nil {
-		return e
-	}
-	order := order{columnName: name, isAsc: true}
-	e.orders = append(e.orders, order)
-	return e
+	return e.addOrder(name, true)
 }
 
 // Add ORDER BY DESC statement.
 func (e *selectExecutor) OrderDesc(name string) *selectExecutor {
-	if e.err != nil {
-		return e
-	}
-	order := order{columnName: name, isAsc: false}
-	e.orders = append(e.orders, order)
-	return e
+	return e.addOrder(name, false)
 }
 
 // Execute SELECT SQL query.
@@ -82,8 +75,7 @@ func (e *selectExecutor) Exec(
 		return e.err
 	}
 	// Build SQL statement.
-	query := e.buildSelect() + " " +
-		e.buildOrderBy() + ";"
+	query := e.buildQuery()
 	// Execute query.
 	startedAt := time.Now()
 	rows, err := e.gari().db.QueryContext(ctx, query)
@@ -124,61 +116,79 @@ func (e *selectExecutor) Exec(
 }
 
 // Build SELECT FROM SQL statement
-func (e *selectExecutor) buildSelect() string {
-	/*
-		tokens := []string{"SELECT"}
-		// Columns
-		quotedTable := fmt.Sprintf("%s%s%s",
-			quote, e.from.name, quote)
-		for i, value := range e.values {
-			quotedColumn :=
-			alias :=
-		}
-		// Table
-		tokens = append(tokens, "FROM", quotedTable)
-		// Order
-
-		// Limit
-		if e.limit > 0 {
-			tokens = append(tokens, "LIMIT")
-			tokens = append(tokens, strconv.Itoa(e.limit))
-		}
-		return strings.Join(tokens, " ")
-	*/
-	var sb strings.Builder
-	sb.WriteString("SELECT ")
+func (e *selectExecutor) buildQuery() string {
+	tokens := []string{"SELECT"}
+	// Column names to select..
 	for i, value := range e.values {
-		if i > 0 {
-			sb.WriteString(", ")
+		// Column name.
+		name := value.column.quotedFullName()
+		tokens = append(tokens, name)
+		// Alias.
+		alias := value.column.fullName()
+		alias = e.gari().quoteIdentifier(alias)
+		if i < (len(e.values) - 1) {
+			alias += ","
 		}
-		sb.WriteString(value.column.quotedFullName())
+		tokens = append(tokens, "AS", alias)
 	}
-	sb.WriteString(" FROM ")
-	sb.WriteString(e.from.quotedName())
-	return sb.String()
+	// FROM table statement.
+	tokens = append(tokens, "FROM")
+	tokens = append(tokens, e.from.quotedName())
+	// WHERE statement.
+	// ORDER BY statement.
+	if len(e.orders) > 0 {
+		tokens = append(tokens, "ORDER", "BY")
+		for i, order := range e.orders {
+			// Column name.
+			name := order.column.quotedFullName()
+			tokens = append(tokens, name)
+			// ASC or DESC.
+			var ascDesc string
+			if order.isAsc {
+				ascDesc = "ASC"
+			} else {
+				ascDesc = "DESC"
+			}
+			if i < (len(e.orders) - 1) {
+				ascDesc += ","
+			}
+			tokens = append(tokens, ascDesc)
+		}
+	}
+	// OFFSET statement.
+	if e.offset > 0 {
+		tokens = append(tokens, "OFFSET")
+		tokens = append(tokens, strconv.Itoa(e.offset))
+	}
+	// LIMIT statement.
+	if e.limit > 0 {
+		tokens = append(tokens, "LIMIT")
+		tokens = append(tokens, strconv.Itoa(e.limit))
+	}
+	// Build query.
+	query := strings.Join(tokens, " ") + ";"
+	e.gari().debugLog("selectExecutor.buildQuery()",
+		slog.String("query", query))
+	return query
 }
 
-// Build ORDER BY SQL statement.
-func (e *selectExecutor) buildOrderBy() string {
-	var sb strings.Builder
-	sb.WriteString("ORDER BY ")
-	for i, order := range e.orders {
-		// Find column in table.
-		col := e.from.column(order.columnName)
-		if col == nil {
-			continue
-		}
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString(col.quotedFullName())
-		if order.isAsc {
-			sb.WriteString(" ASC")
-		} else {
-			sb.WriteString(" DESC")
-		}
+// Add ORDER BY statement.
+func (e *selectExecutor) addOrder(name string, isAsc bool) *selectExecutor {
+	if e.err != nil {
+		return e
 	}
-	return sb.String()
+	// Find column in tables.
+	col := e.from.column(name)
+	// TODO: Find column in joined tables.
+	if col == nil {
+		e.err = errs.Wrap(ErrOrderColumnNotFound,
+			errs.WithContext("name", name))
+		e.gari().errorLog(e.err.Error())
+		return e
+	}
+	order := order{column: col, isAsc: isAsc}
+	e.orders = append(e.orders, order)
+	return e
 }
 
 func (e *selectExecutor) gari() *Gari {
