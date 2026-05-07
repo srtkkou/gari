@@ -11,8 +11,8 @@ import (
 )
 
 type (
-	// Builder to build SELECT SQL.
-	selectBuilder struct {
+	// Executor to run SELECT SQL.
+	selectExecutor struct {
 		from   *Table // Main table to select from.
 		values []*value
 		err    error // Error.
@@ -39,9 +39,9 @@ var (
 	ErrColumnNotFound = errors.New("ErrColumnNotFound")
 )
 
-// Create new selectBuilder.
-func newSelectBuilder(t *Table) *selectBuilder {
-	b := selectBuilder{
+// Create new selectExecutor.
+func newSelectExecutor(t *Table) *selectExecutor {
+	e := selectExecutor{
 		from:   t,
 		values: make([]*value, len(t.columns)),
 		orders: make([]order, 0),
@@ -49,53 +49,52 @@ func newSelectBuilder(t *Table) *selectBuilder {
 	}
 	// Initialize values from columns.
 	for i, col := range t.columns {
-		b.values[i] = newValue(col)
+		e.values[i] = newValue(col)
 	}
-	return &b
+	return &e
 }
 
 // Add ORDER BY ASC statement.
-func (b *selectBuilder) OrderAsc(name string) *selectBuilder {
-	if b.err != nil {
-		return b
+func (e *selectExecutor) OrderAsc(name string) *selectExecutor {
+	if e.err != nil {
+		return e
 	}
 	order := order{columnName: name, isAsc: true}
-	b.orders = append(b.orders, order)
-	return b
+	e.orders = append(e.orders, order)
+	return e
 }
 
 // Add ORDER BY DESC statement.
-func (b *selectBuilder) OrderDesc(name string) *selectBuilder {
-	if b.err != nil {
-		return b
+func (e *selectExecutor) OrderDesc(name string) *selectExecutor {
+	if e.err != nil {
+		return e
 	}
 	order := order{columnName: name, isAsc: false}
-	b.orders = append(b.orders, order)
-	return b
+	e.orders = append(e.orders, order)
+	return e
 }
 
 // Execute SELECT SQL query.
-func (b *selectBuilder) Exec(
+func (e *selectExecutor) Exec(
 	ctx context.Context, fn func(r *Record),
 ) error {
-	if b.err != nil {
-		return b.err
+	if e.err != nil {
+		return e.err
 	}
 	// Build SQL statement.
-	query := b.buildSelect() + " " +
-		b.buildOrderBy() + ";"
+	query := e.buildSelect() + " " +
+		e.buildOrderBy() + ";"
 	// Execute query.
-	db := b.from.gari.db
 	startedAt := time.Now()
-	rows, err := db.QueryContext(ctx, query)
+	rows, err := e.gari().db.QueryContext(ctx, query)
 	if err != nil {
-		b.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
+		e.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
 			errs.WithContext("query", query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.gari().errorLog(b.err.Error())
-		return b.err
+		e.gari().errorLog(e.err.Error())
+		return e.err
 	}
-	b.gari().infoLog("selectBuilder.Exec",
+	e.gari().infoLog("selectExecutor.Exec",
 		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 	defer rows.Close()
@@ -105,16 +104,16 @@ func (b *selectBuilder) Exec(
 		// Count up.
 		count += 1
 		// Scan values.
-		args := make([]any, len(b.values))
+		args := make([]any, len(e.values))
 		for i := range args {
-			args[i] = b.values[i]
+			args[i] = e.values[i]
 		}
 		err = rows.Scan(args...)
 		if err != nil {
 			return err
 		}
 		// Pass Record to func.
-		r := newRecord(b.values)
+		r := newRecord(e.values)
 		fn(r)
 	}
 	// Check error
@@ -125,13 +124,13 @@ func (b *selectBuilder) Exec(
 }
 
 // Build SELECT FROM SQL statement
-func (b *selectBuilder) buildSelect() string {
+func (e *selectExecutor) buildSelect() string {
 	/*
 		tokens := []string{"SELECT"}
 		// Columns
 		quotedTable := fmt.Sprintf("%s%s%s",
-			quote, b.from.name, quote)
-		for i, value := range b.values {
+			quote, e.from.name, quote)
+		for i, value := range e.values {
 			quotedColumn :=
 			alias :=
 		}
@@ -140,21 +139,21 @@ func (b *selectBuilder) buildSelect() string {
 		// Order
 
 		// Limit
-		if b.limit > 0 {
+		if e.limit > 0 {
 			tokens = append(tokens, "LIMIT")
-			tokens = append(tokens, strconv.Itoa(b.limit))
+			tokens = append(tokens, strconv.Itoa(e.limit))
 		}
 		return strings.Join(tokens, " ")
 	*/
 	var sb strings.Builder
-	quote := b.from.gari.columnQuote
+	quote := e.from.gari.columnQuote
 	sb.WriteString("SELECT ")
-	for i, value := range b.values {
+	for i, value := range e.values {
 		if i > 0 {
 			sb.WriteString(", ")
 		}
 		sb.WriteString(quote)
-		sb.WriteString(b.from.Name())
+		sb.WriteString(e.from.Name())
 		sb.WriteString(quote)
 		sb.WriteString(".")
 		sb.WriteString(quote)
@@ -163,19 +162,19 @@ func (b *selectBuilder) buildSelect() string {
 	}
 	sb.WriteString(" FROM ")
 	sb.WriteString(quote)
-	sb.WriteString(b.from.name)
+	sb.WriteString(e.from.name)
 	sb.WriteString(quote)
 	return sb.String()
 }
 
 // Build ORDER BY SQL statement.
-func (b *selectBuilder) buildOrderBy() string {
+func (e *selectExecutor) buildOrderBy() string {
 	var sb strings.Builder
-	quote := b.from.gari.columnQuote
+	quote := e.from.gari.columnQuote
 	sb.WriteString("ORDER BY ")
-	for i, order := range b.orders {
+	for i, order := range e.orders {
 		// Find column in table.
-		col := b.from.column(order.columnName)
+		col := e.from.column(order.columnName)
 		if col == nil {
 			continue
 		}
@@ -183,7 +182,7 @@ func (b *selectBuilder) buildOrderBy() string {
 			sb.WriteString(", ")
 		}
 		sb.WriteString(quote)
-		sb.WriteString(b.from.name)
+		sb.WriteString(e.from.name)
 		sb.WriteString(quote)
 		sb.WriteString(".")
 		sb.WriteString(quote)
@@ -198,6 +197,6 @@ func (b *selectBuilder) buildOrderBy() string {
 	return sb.String()
 }
 
-func (b *selectBuilder) gari() *Gari {
-	return b.from.gari
+func (e *selectExecutor) gari() *Gari {
+	return e.from.gari
 }

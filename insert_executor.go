@@ -14,8 +14,8 @@ import (
 )
 
 type (
-	// Builder to build INSERT SQL.
-	insertBuilder struct {
+	// Executor to run INSERT SQL.
+	insertExecutor struct {
 		table    *Table    // Pointer to table.
 		columns  []*column // Slice of columns except primary key.
 		query    string    // INSERT SQL query.
@@ -35,9 +35,9 @@ var (
 	ErrInsertRowCount     = errors.New("gari.ErrInsertRowCount")
 )
 
-// Create new insertBuilder instance.
-func newInsertBuilder(t *Table) *insertBuilder {
-	b := insertBuilder{
+// Create new insertExecutor instance.
+func newInsertExecutor(t *Table) *insertExecutor {
+	e := insertExecutor{
 		table:   t,
 		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
@@ -48,98 +48,98 @@ func newInsertBuilder(t *Table) *insertBuilder {
 		if col.primary {
 			continue
 		}
-		b.columns = append(b.columns, col)
+		e.columns = append(e.columns, col)
 	}
 	// Build INSERT SQL query.
-	b.query = b.buildQuery()
-	return &b
+	e.query = e.buildQuery()
+	return &e
 }
 
 // Add values to insert.
-func (b *insertBuilder) Values(ptrs ...any) *insertBuilder {
-	if b.err != nil {
-		return b
+func (e *insertExecutor) Values(ptrs ...any) *insertExecutor {
+	if e.err != nil {
+		return e
 	}
 	for _, ptr := range ptrs {
 		// Convert to msgpack.
 		blob, err := msgpack.Marshal(ptr)
 		if err != nil {
-			b.err = errs.Wrap(ErrInsertValuesEncode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrInsertValuesEncode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			b.gari().errorLog(b.err.Error())
-			return b
+			e.gari().errorLog(e.err.Error())
+			return e
 		}
 		// Unmarshal msgpack to map[string]encoded.
 		m, err := splitToMap(blob)
 		if err != nil {
-			b.err = errs.Wrap(ErrInsertValuesDecode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrInsertValuesDecode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr),
 				errs.WithContext("msgpack", blob))
-			return b
+			return e
 		}
 		// Build record.
-		values := make([]*value, len(b.columns))
-		for i, col := range b.columns {
+		values := make([]*value, len(e.columns))
+		for i, col := range e.columns {
 			values[i] = newValue(col)
 			values[i].blob = m[col.fieldName]
 		}
 		r := newRecord(values)
-		b.records = append(b.records, r)
+		e.records = append(e.records, r)
 	}
-	return b
+	return e
 }
 
 // Execute INSERT SQL statement.
-func (b *insertBuilder) Exec(ctx context.Context) error {
+func (e *insertExecutor) Exec(ctx context.Context) error {
 	defer func() {
-		b.records = make([]*Record, 0)
+		e.records = make([]*Record, 0)
 	}()
 	// Check if error exists.
-	if b.err != nil {
-		return b.err
+	if e.err != nil {
+		return e.err
 	}
 	// Check if records are not empty.
-	if len(b.records) == 0 {
-		b.err = errs.Wrap(ErrInsertRecordsEmpty,
-			errs.WithContext("query", b.query))
-		b.gari().errorLog(b.err.Error())
-		return b.err
+	if len(e.records) == 0 {
+		e.err = errs.Wrap(ErrInsertRecordsEmpty,
+			errs.WithContext("query", e.query))
+		e.gari().errorLog(e.err.Error())
+		return e.err
 	}
-	for _, r := range b.records {
+	for _, r := range e.records {
 		// TODO:BEFORE INSERT
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
-		result, err := b.prepared.ExecContext(ctx, args...)
+		result, err := e.prepared.ExecContext(ctx, args...)
 		if err != nil {
-			b.err = errs.Wrap(ErrInsertExec, errs.WithCause(err),
-				errs.WithContext("query", b.query),
+			e.err = errs.Wrap(ErrInsertExec, errs.WithCause(err),
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
-		b.gari().infoLog("Execute INSERT SQL.",
-			slog.String("query", b.query),
+		e.gari().infoLog("Execute INSERT SQL.",
+			slog.String("query", e.query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
 		count, err := result.RowsAffected()
 		if err != nil {
-			b.err = errs.Wrap(ErrInsertRowsAffected,
+			e.err = errs.Wrap(ErrInsertRowsAffected,
 				errs.WithCause(err),
-				errs.WithContext("query", b.query),
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
 		if count != 1 {
-			b.err = errs.Wrap(ErrInsertRowCount,
-				errs.WithContext("query", b.query),
+			e.err = errs.Wrap(ErrInsertRowCount,
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
 		// TODO:AFTER INSERT
 	}
@@ -147,61 +147,60 @@ func (b *insertBuilder) Exec(ctx context.Context) error {
 }
 
 // Close prepared statement.
-func (b *insertBuilder) closePreparedStmt() {
-	if b.prepared != nil {
-		b.prepared.Close()
-		b.gari().infoLog("insertBuilder.closePreparedStmt()")
+func (e *insertExecutor) closePreparedStmt() {
+	if e.prepared != nil {
+		e.prepared.Close()
+		e.gari().infoLog("insertExecutor.closePreparedStmt()")
 	}
 }
 
 // Build INSERT SQL statement.
-func (b *insertBuilder) buildQuery() string {
+func (e *insertExecutor) buildQuery() string {
 	tokens := []string{"INSERT", "INTO"}
 	// Add table name.
-	quote := b.table.gari.columnQuote
-	table := fmt.Sprintf("%s%s%s", quote, b.table.name, quote)
+	quote := e.table.gari.columnQuote
+	table := fmt.Sprintf("%s%s%s", quote, e.table.name, quote)
 	tokens = append(tokens, table, "(")
 	// Add column names.
-	for i, col := range b.columns {
+	for i, col := range e.columns {
 		name := fmt.Sprintf("%s%s%s", quote, col.name, quote)
-		if i < (len(b.columns) - 1) {
+		if i < (len(e.columns) - 1) {
 			name += ","
 		}
 		tokens = append(tokens, name)
 	}
 	// Add value placeholders.
 	tokens = append(tokens, ")", "VALUES", "(")
-	for i := range b.columns {
-		ph := b.table.gari.placeholder(i)
-		if i < (len(b.columns) - 1) {
+	for i := range e.columns {
+		ph := e.table.gari.placeholder(i)
+		if i < (len(e.columns) - 1) {
 			ph += ","
 		}
 		tokens = append(tokens, ph)
 	}
 	tokens = append(tokens, ");")
 	query := strings.Join(tokens, " ")
-	b.gari().debugLog("insertBuilder.buildQuery()",
+	e.gari().debugLog("insertExecutor.buildQuery()",
 		slog.String("query", query))
 	return query
 }
 
 // Prepare INSERT SQL statement.
-func (b *insertBuilder) prepareStmt() {
+func (e *insertExecutor) prepareStmt() {
 	var err error
-	db := b.table.gari.db
 	startedAt := time.Now()
-	b.prepared, err = db.Prepare(b.query)
+	e.prepared, err = e.gari().db.Prepare(e.query)
 	if err != nil {
-		b.err = errs.Wrap(ErrInsertPrepare, errs.WithCause(err),
-			errs.WithContext("query", b.query),
+		e.err = errs.Wrap(ErrInsertPrepare, errs.WithCause(err),
+			errs.WithContext("query", e.query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.gari().errorLog(b.err.Error())
+		e.gari().errorLog(e.err.Error())
 	}
-	b.gari().infoLog("insertBuilder.prepareStmt()",
-		slog.String("query", b.query),
+	e.gari().infoLog("insertExecutor.prepareStmt()",
+		slog.String("query", e.query),
 		slog.Duration("duration", time.Since(startedAt)))
 }
 
-func (b *insertBuilder) gari() *Gari {
-	return b.table.gari
+func (e *insertExecutor) gari() *Gari {
+	return e.table.gari
 }

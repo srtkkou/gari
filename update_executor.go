@@ -14,8 +14,8 @@ import (
 )
 
 type (
-	// Builder to build UPDATE SQL.
-	updateBuilder struct {
+	// Executor to run UPDATE SQL.
+	updateExecutor struct {
 		table    *Table    // Pointer to table.
 		columns  []*column // Slice of column pointers.
 		query    string    // UPDATE SQL query.
@@ -35,9 +35,9 @@ var (
 	ErrUpdateRowCount     = errors.New("gari.ErrUpdateRowCount")
 )
 
-// Create new updateBuilder instance.
-func newUpdateBuilder(t *Table) *updateBuilder {
-	b := updateBuilder{
+// Create new updateExecutor instance.
+func newUpdateExecutor(t *Table) *updateExecutor {
+	b := updateExecutor{
 		table:   t,
 		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
@@ -51,13 +51,13 @@ func newUpdateBuilder(t *Table) *updateBuilder {
 	}
 	// Build UPDATE SQL query.
 	b.query = b.buildQuery()
-	b.gari().infoLog("newUpdateBuilder",
+	b.gari().infoLog("newUpdateExecutor",
 		slog.String("query", b.query))
 	return &b
 }
 
 // Add values to update.
-func (b *updateBuilder) Values(ptrs ...any) *updateBuilder {
+func (b *updateExecutor) Values(ptrs ...any) *updateExecutor {
 	if b.err != nil {
 		return b
 	}
@@ -98,7 +98,7 @@ func (b *updateBuilder) Values(ptrs ...any) *updateBuilder {
 }
 
 // Execute UPDATE SQL statement.
-func (b *updateBuilder) Exec(ctx context.Context) error {
+func (b *updateExecutor) Exec(ctx context.Context) error {
 	defer func() {
 		b.records = make([]*Record, 0)
 	}()
@@ -155,14 +155,14 @@ func (b *updateBuilder) Exec(ctx context.Context) error {
 }
 
 // Close prepared statement.
-func (b *updateBuilder) closePreparedStmt() {
+func (b *updateExecutor) closePreparedStmt() {
 	if b.prepared != nil {
 		b.prepared.Close()
 	}
 }
 
 // Build SQL statement.
-func (b *updateBuilder) buildQuery() string {
+func (b *updateExecutor) buildQuery() string {
 	tokens := []string{"UPDATE"}
 	// Add table name.
 	quote := b.table.gari.columnQuote
@@ -189,7 +189,7 @@ func (b *updateBuilder) buildQuery() string {
 }
 
 // Prepare UPDATE SQL statement.
-func (b *updateBuilder) prepareStmt() {
+func (b *updateExecutor) prepareStmt() {
 	startedAt := time.Now()
 	var err error
 	db := b.table.gari.db
@@ -205,6 +205,6 @@ func (b *updateBuilder) prepareStmt() {
 		slog.Duration("duration", time.Since(startedAt)))
 }
 
-func (b *updateBuilder) gari() *Gari {
+func (b *updateExecutor) gari() *Gari {
 	return b.table.gari
 }

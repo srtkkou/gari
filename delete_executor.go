@@ -14,8 +14,8 @@ import (
 )
 
 type (
-	// Builder to build UPDATE SQL.
-	deleteBuilder struct {
+	// Executor to run DELETE SQL.
+	deleteExecutor struct {
 		table    *Table    // Pointer to table.
 		query    string    // UPDATE SQL query.
 		prepared *sql.Stmt // Prepared statement pointer.
@@ -34,101 +34,101 @@ var (
 	ErrDeleteRowCount     = errors.New("gari.ErrDeleteRowCount")
 )
 
-// Create new deleteBuilder instance.
-func newDeleteBuilder(t *Table) *deleteBuilder {
-	b := deleteBuilder{
+// Create new deleteExecutor instance.
+func newDeleteExecutor(t *Table) *deleteExecutor {
+	e := deleteExecutor{
 		table:   t,
 		records: make([]*Record, 0),
 	}
 	// Build DELETE SQL query.
-	b.query = b.buildQuery()
-	return &b
+	e.query = e.buildQuery()
+	return &e
 }
 
 // Add values to dalete.
-func (b *deleteBuilder) Values(ptrs ...any) *deleteBuilder {
-	if b.err != nil {
-		return b
+func (e *deleteExecutor) Values(ptrs ...any) *deleteExecutor {
+	if e.err != nil {
+		return e
 	}
 	for _, ptr := range ptrs {
 		// Convert to msgpack.
 		blob, err := msgpack.Marshal(ptr)
 		if err != nil {
-			b.err = errs.Wrap(ErrDeleteValuesEncode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrDeleteValuesEncode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			b.gari().errorLog(b.err.Error())
-			return b
+			e.gari().errorLog(e.err.Error())
+			return e
 		}
 		// Unmarshal msgpack to map[string]encoded.
 		m, err := splitToMap(blob)
 		if err != nil {
-			b.err = errs.Wrap(ErrDeleteValuesDecode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrDeleteValuesDecode, errs.WithCause(err),
 				errs.WithContext("ptr", ptr),
 				errs.WithContext("msgpack", blob))
-			b.gari().errorLog(b.err.Error())
-			return b
+			e.gari().errorLog(e.err.Error())
+			return e
 		}
 		// Build record.
 		values := make([]*value, 1)
-		values[0] = newValue(b.table.pkey)
-		values[0].blob = m[b.table.pkey.fieldName]
+		values[0] = newValue(e.table.pkey)
+		values[0].blob = m[e.table.pkey.fieldName]
 		r := newRecord(values)
-		b.records = append(b.records, r)
+		e.records = append(e.records, r)
 	}
-	return b
+	return e
 }
 
 // Execute UPDATE SQL statement.
-func (b *deleteBuilder) Exec(ctx context.Context) error {
+func (e *deleteExecutor) Exec(ctx context.Context) error {
 	defer func() {
-		b.records = make([]*Record, 0)
+		e.records = make([]*Record, 0)
 	}()
 	// Check if error exists.
-	if b.err != nil {
-		return b.err
+	if e.err != nil {
+		return e.err
 	}
 	// Check if records are not empty.
-	if len(b.records) == 0 {
-		b.err = errs.Wrap(ErrDeleteRecordsEmpty,
-			errs.WithContext("query", b.query))
-		b.gari().errorLog(b.err.Error())
-		return b.err
+	if len(e.records) == 0 {
+		e.err = errs.Wrap(ErrDeleteRecordsEmpty,
+			errs.WithContext("query", e.query))
+		e.gari().errorLog(e.err.Error())
+		return e.err
 	}
-	for _, r := range b.records {
+	for _, r := range e.records {
 		// TODO:BEFORE UPDATE
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
-		result, err := b.prepared.ExecContext(ctx, args...)
+		result, err := e.prepared.ExecContext(ctx, args...)
 		if err != nil {
-			b.err = errs.Wrap(ErrDeleteExec, errs.WithCause(err),
-				errs.WithContext("query", b.query),
+			e.err = errs.Wrap(ErrDeleteExec, errs.WithCause(err),
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
-		b.gari().infoLog("Execute UPDATE SQL.",
-			slog.String("query", b.query),
+		e.gari().infoLog("Execute UPDATE SQL.",
+			slog.String("query", e.query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
 		count, err := result.RowsAffected()
 		if err != nil {
-			b.err = errs.Wrap(ErrDeleteRowsAffected,
+			e.err = errs.Wrap(ErrDeleteRowsAffected,
 				errs.WithCause(err),
-				errs.WithContext("query", b.query),
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
 		if count != 1 {
-			b.err = errs.Wrap(ErrDeleteRowCount,
-				errs.WithContext("query", b.query),
+			e.err = errs.Wrap(ErrDeleteRowCount,
+				errs.WithContext("query", e.query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
-			b.gari().errorLog(b.err.Error())
-			return b.err
+			e.gari().errorLog(e.err.Error())
+			return e.err
 		}
 		// TODO:AFTER UPDATE
 	}
@@ -136,45 +136,44 @@ func (b *deleteBuilder) Exec(ctx context.Context) error {
 }
 
 // Close prepared statement.
-func (b *deleteBuilder) closePreparedStmt() {
-	if b.prepared != nil {
-		b.prepared.Close()
+func (e *deleteExecutor) closePreparedStmt() {
+	if e.prepared != nil {
+		e.prepared.Close()
 	}
 }
 
 // Build SQL statement.
-func (b *deleteBuilder) buildQuery() string {
+func (e *deleteExecutor) buildQuery() string {
 	tokens := []string{"DELETE", "FROM"}
 	// Add table name.
-	quote := b.table.gari.columnQuote
-	table := fmt.Sprintf("%s%s%s", quote, b.table.name, quote)
+	quote := e.table.gari.columnQuote
+	table := fmt.Sprintf("%s%s%s", quote, e.table.name, quote)
 	tokens = append(tokens, table)
 	// Add WHERE statement.
 	tokens = append(tokens, "WHERE")
-	pkey := fmt.Sprintf("%s%s%s", quote, b.table.pkey.name, quote)
+	pkey := fmt.Sprintf("%s%s%s", quote, e.table.pkey.name, quote)
 	tokens = append(tokens, pkey, "=")
-	ph := b.table.gari.placeholder(0) + ";"
+	ph := e.table.gari.placeholder(0) + ";"
 	tokens = append(tokens, ph)
 	return strings.Join(tokens, " ")
 }
 
 // Prepare UPDATE SQL statement.
-func (b *deleteBuilder) prepareStmt() {
+func (e *deleteExecutor) prepareStmt() {
 	startedAt := time.Now()
 	var err error
-	db := b.table.gari.db
-	b.prepared, err = db.Prepare(b.query)
+	e.prepared, err = e.gari().db.Prepare(e.query)
 	if err != nil {
-		b.err = errs.Wrap(ErrDeletePrepare, errs.WithCause(err),
-			errs.WithContext("query", b.query),
+		e.err = errs.Wrap(ErrDeletePrepare, errs.WithCause(err),
+			errs.WithContext("query", e.query),
 			errs.WithContext("duration", time.Since(startedAt)))
-		b.gari().errorLog(b.err.Error())
+		e.gari().errorLog(e.err.Error())
 	}
-	b.gari().infoLog("deleteBuilder.prepareStmt()",
-		slog.String("query", b.query),
+	e.gari().infoLog("deleteExecutor.prepareStmt()",
+		slog.String("query", e.query),
 		slog.Duration("duration", time.Since(startedAt)))
 }
 
-func (b *deleteBuilder) gari() *Gari {
-	return b.table.gari
+func (e *deleteExecutor) gari() *Gari {
+	return e.table.gari
 }

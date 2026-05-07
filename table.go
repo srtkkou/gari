@@ -13,14 +13,14 @@ import (
 type (
 	// Table
 	Table struct {
-		gari          *Gari              // Pointer to gari config.
-		name          string             // Table name.
-		columns       []*column          // Slice of pointer to columns.
-		columnMap     map[string]*column // Map of columns.
-		pkey          *column            // Pointer to PRIMARY KEY column.
-		insertBuilder *insertBuilder     // Builder to execute INSERT SQL.
-		updateBuilder *updateBuilder     // Builder to execute UPDATE SQL.
-		deleteBuilder *deleteBuilder     // Builder to execute DELETE SQL.
+		gari           *Gari              // Pointer to gari config.
+		name           string             // Table name.
+		columns        []*column          // Slice of pointer to columns.
+		columnMap      map[string]*column // Map of columns.
+		pkey           *column            // Pointer to PRIMARY KEY column.
+		insertExecutor *insertExecutor    // Executor to execute INSERT SQL.
+		updateExecutor *updateExecutor    // Executor to execute UPDATE SQL.
+		deleteExecutor *deleteExecutor    // Executor to execute DELETE SQL.
 	}
 )
 
@@ -72,72 +72,76 @@ func (t *Table) FieldNames() []string {
 }
 
 // Build SELECT SQL statement.
-func (t *Table) Select() *selectBuilder {
-	return newSelectBuilder(t)
+func (t *Table) Select() *selectExecutor {
+	return newSelectExecutor(t)
 }
 
 // Execute INSERT SQL statement.
-func (t *Table) Insert() *insertBuilder {
-	if t.insertBuilder != nil {
-		return t.insertBuilder
+func (t *Table) Insert() *insertExecutor {
+	if t.insertExecutor != nil {
+		return t.insertExecutor
 	}
-	t.insertBuilder = newInsertBuilder(t)
-	t.insertBuilder.prepareStmt()
-	return t.insertBuilder
+	t.insertExecutor = newInsertExecutor(t)
+	t.insertExecutor.prepareStmt()
+	return t.insertExecutor
 }
 
 // Execute UPDATE SQL statement.
-func (t *Table) Update() *updateBuilder {
-	if t.updateBuilder != nil {
-		return t.updateBuilder
+func (t *Table) Update() *updateExecutor {
+	if t.updateExecutor != nil {
+		return t.updateExecutor
 	}
-	t.updateBuilder = newUpdateBuilder(t)
-	t.updateBuilder.prepareStmt()
-	return t.updateBuilder
+	t.updateExecutor = newUpdateExecutor(t)
+	t.updateExecutor.prepareStmt()
+	return t.updateExecutor
 }
 
 // Execute DELETE SQL statement.
-func (t *Table) Delete() *deleteBuilder {
-	if t.deleteBuilder != nil {
-		return t.deleteBuilder
+func (t *Table) Delete() *deleteExecutor {
+	if t.deleteExecutor != nil {
+		return t.deleteExecutor
 	}
-	t.deleteBuilder = newDeleteBuilder(t)
-	t.deleteBuilder.prepareStmt()
-	return t.deleteBuilder
+	t.deleteExecutor = newDeleteExecutor(t)
+	t.deleteExecutor.prepareStmt()
+	return t.deleteExecutor
 }
 
 // Execute DDL SQL to migrate table.
 func (t *Table) Migrate(ctx context.Context) error {
 	// Build DDL SQL.
-	ddl, err := newDdlBuilder(t).build()
-	fmt.Printf("MIGRATE(err=%v)\nSQL=%s\n", err, ddl)
+	query, err := newDdlBuilder(t).build()
+	if err != nil {
+		err = errs.Wrap(ErrTableMigrate, errs.WithCause(err))
+		t.gari.errorLog(err.Error())
+		return err
+	}
 	// Execute query.
 	db := t.gari.db
 	startedAt := time.Now()
-	_, err = db.ExecContext(ctx, ddl)
+	_, err = db.ExecContext(ctx, query)
 	if err != nil {
 		err = errs.Wrap(ErrTableMigrate, errs.WithCause(err),
-			errs.WithContext("query", ddl),
+			errs.WithContext("query", query),
 			errs.WithContext("duration", time.Since(startedAt)))
 		t.gari.errorLog(err.Error())
 		return err
 	}
 	t.gari.infoLog("Table.Migrate()",
-		slog.String("query", ddl),
+		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 	return nil
 }
 
 // Close prepared statements.
 func (t *Table) closeTable() (err error) {
-	if t.insertBuilder != nil {
-		t.insertBuilder.closePreparedStmt()
+	if t.insertExecutor != nil {
+		t.insertExecutor.closePreparedStmt()
 	}
-	if t.updateBuilder != nil {
-		t.updateBuilder.closePreparedStmt()
+	if t.updateExecutor != nil {
+		t.updateExecutor.closePreparedStmt()
 	}
-	if t.deleteBuilder != nil {
-		t.deleteBuilder.closePreparedStmt()
+	if t.deleteExecutor != nil {
+		t.deleteExecutor.closePreparedStmt()
 	}
 	return nil
 }
