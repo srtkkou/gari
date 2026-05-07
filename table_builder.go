@@ -19,28 +19,28 @@ var (
 )
 
 // Add bool type column.
-func (b *TableBuilder) AddBoolColumn(
+func (b *TableBuilder) BoolColumn(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
 	return b.addColumnWithKind(name, kindBool, opts)
 }
 
 // Add string type column.
-func (b *TableBuilder) AddStringColumn(
+func (b *TableBuilder) StringColumn(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
 	return b.addColumnWithKind(name, kindString, opts)
 }
 
 // Add time type column.
-func (b *TableBuilder) AddTimeColumn(
+func (b *TableBuilder) TimeColumn(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
 	return b.addColumnWithKind(name, kindTime, opts)
 }
 
 // Add int64 type column.
-func (b *TableBuilder) AddInt64Column(
+func (b *TableBuilder) Int64Column(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
 	return b.addColumnWithKind(name, kindInt64, opts)

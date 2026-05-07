@@ -2,7 +2,9 @@ package gari
 
 import (
 	"context"
+	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
@@ -11,9 +13,12 @@ import (
 func TestSqlmock(t *testing.T) {
 	// Define struct.
 	type testModel struct {
-		Model
-		Num  int
-		Text string
+		Id        int
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		DeletedAt sql.NullTime
+		Num       int
+		Text      string
 	}
 	// Open sqlmock.
 	db, mock, err := sqlmock.New()
@@ -29,9 +34,13 @@ func TestSqlmock(t *testing.T) {
 	defer gari.Close()
 	// Define table.
 	table, err := gari.Table("test_models").
-		AddInt64Column("num",
+		Int64Column("id", PrimaryKey(true), NotNull()).
+		TimeColumn("created_at", NotNull()).
+		TimeColumn("updated_at", NotNull()).
+		TimeColumn("deleted_at", DefaultNull()).
+		Int64Column("num",
 			NotNull(), DefaultInt64(0)).
-		AddStringColumn("text",
+		StringColumn("text",
 			NotNull(), Size(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)

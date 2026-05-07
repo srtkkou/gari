@@ -17,11 +17,12 @@ func TestTableBuilder(t *testing.T) {
 	defer g.Close()
 	// Define table.
 	table, err := g.Table("users").
-		AddStringColumn("xid",
+		Int64Column("id", PrimaryKey(true), NotNull()).
+		StringColumn("xid",
 			NotNull(), Size(32), DefaultString("")).
-		AddTimeColumn("created_at",
+		TimeColumn("created_at",
 			DefaultNull()).
-		AddBoolColumn("ok",
+		BoolColumn("ok",
 			NotNull(), DefaultBool(false)).
 		Define()
 	require.NoError(t, err)

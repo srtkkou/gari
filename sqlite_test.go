@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"testing"
+	"time"
 
 	_ "github.com/glebarez/go-sqlite"
 	"github.com/stretchr/testify/require"
@@ -13,9 +14,12 @@ import (
 func TestSqlite(t *testing.T) {
 	// Define struct.
 	type testModel struct {
-		Model
-		Num  int
-		Text string
+		Id        int
+		CreatedAt time.Time
+		UpdatedAt time.Time
+		DeletedAt sql.NullTime
+		Num       int
+		Text      string
 	}
 	// Open SQLite
 	db, err := sql.Open("sqlite", ":memory:?_foreign_keys(1)")
@@ -31,9 +35,13 @@ func TestSqlite(t *testing.T) {
 	defer gari.Close()
 	// Define table.
 	table, err := gari.Table("test_models").
-		AddInt64Column("num",
+		Int64Column("id", PrimaryKey(true), NotNull()).
+		TimeColumn("created_at", NotNull()).
+		TimeColumn("updated_at", NotNull()).
+		TimeColumn("deleted_at", DefaultNull()).
+		Int64Column("num",
 			NotNull(), DefaultInt64(0)).
-		AddStringColumn("text",
+		StringColumn("text",
 			NotNull(), Size(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)

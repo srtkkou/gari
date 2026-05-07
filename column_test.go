@@ -32,8 +32,8 @@ func TestColumnDefaultBool(t *testing.T) {
 		defer g.Close()
 		t.Run(test.name, func(t *testing.T) {
 			table, err := g.Table("test").
-				AddBoolColumn("is_ok",
-					DefaultBool(test.input)).
+				Int64Column("id", PrimaryKey(true), NotNull()).
+				BoolColumn("is_ok", DefaultBool(test.input)).
 				Define()
 			require.NoError(t, err)
 			col := table.column("is_ok")
