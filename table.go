@@ -18,8 +18,9 @@ type (
 		columns       []*column          // Slice of pointer to columns.
 		columnMap     map[string]*column // Map of columns.
 		pkey          *column            // Pointer to PRIMARY KEY column.
-		insertBuilder *insertBuilder     // INSERT builder.
-		updateBuilder *updateBuilder     // UPDATE builder.
+		insertBuilder *insertBuilder     // Builder to execute INSERT SQL.
+		updateBuilder *updateBuilder     // Builder to execute UPDATE SQL.
+		deleteBuilder *deleteBuilder     // Builder to execute DELETE SQL.
 	}
 )
 
@@ -95,6 +96,16 @@ func (t *Table) Update() *updateBuilder {
 	return t.updateBuilder
 }
 
+// Execute DELETE SQL statement.
+func (t *Table) Delete() *deleteBuilder {
+	if t.deleteBuilder != nil {
+		return t.deleteBuilder
+	}
+	t.deleteBuilder = newDeleteBuilder(t)
+	t.deleteBuilder.prepareStmt()
+	return t.deleteBuilder
+}
+
 // Execute DDL SQL to migrate table.
 func (t *Table) Migrate(ctx context.Context) error {
 	// Build DDL SQL.
@@ -124,6 +135,9 @@ func (t *Table) closeTable() (err error) {
 	}
 	if t.updateBuilder != nil {
 		t.updateBuilder.closePreparedStmt()
+	}
+	if t.deleteBuilder != nil {
+		t.deleteBuilder.closePreparedStmt()
 	}
 	return nil
 }
