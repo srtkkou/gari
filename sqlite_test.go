@@ -3,6 +3,7 @@ package gari
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"testing"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -41,13 +42,20 @@ func TestSqlite(t *testing.T) {
 	err = table.Migrate(ctx)
 	require.NoError(t, err)
 	// INSERT.
-	m1 := testModel{Num: 101, Text: "str1"}
-	m2 := testModel{Num: 102, Text: "str2"}
-	m3 := testModel{Num: 103, Text: "str3"}
-	err = table.Insert().Values(&m1, &m2, &m3).Exec(ctx)
+	models := make([]*testModel, 5)
+	models[0] = &testModel{Num: 100, Text: "str0"}
+	models[1] = &testModel{Num: 101, Text: "str1"}
+	models[2] = &testModel{Num: 102, Text: "str2"}
+	models[3] = &testModel{Num: 103, Text: "str3"}
+	models[4] = &testModel{Num: 104, Text: "str4"}
+	args := make([]any, len(models))
+	for i := range args {
+		args[i] = models[i]
+	}
+	err = table.Insert().Values(args...).Exec(ctx)
 	require.NoError(t, err)
 	// SELECT.
-	models := make([]testModel, 0)
+	results := make([]testModel, 0)
 	err = table.Select().OrderAsc("num").Exec(ctx, func(r *Record) {
 		m := testModel{}
 		r.SetInt("id", &m.Id)
@@ -56,25 +64,24 @@ func TestSqlite(t *testing.T) {
 		r.SetNullTime("deleted_at", &m.DeletedAt)
 		r.SetInt("num", &m.Num)
 		r.SetString("text", &m.Text)
-		models = append(models, m)
+		results = append(results, m)
 	})
 	require.NoError(t, err)
 	// Check result.
-	require.Equal(t, 3, len(models))
-	require.Equal(t, 1, models[0].Id)
-	require.Equal(t, 101, models[0].Num)
-	require.Equal(t, "str1", models[0].Text)
-	require.Equal(t, 2, models[1].Id)
-	require.Equal(t, 102, models[1].Num)
-	require.Equal(t, "str2", models[1].Text)
-	require.Equal(t, 3, models[2].Id)
-	require.Equal(t, 103, models[2].Num)
-	require.Equal(t, "str3", models[2].Text)
+	require.Equal(t, len(models), len(results))
+	for i := range len(results) {
+		require.Equal(t, i+1, results[i].Id)
+		require.Equal(t, i+100, results[i].Num)
+		require.Equal(t, fmt.Sprintf("str%d", i), results[i].Text)
+	}
 	// UPDATE.
-	models[1].Num = 202
-	models[1].Text = "STR2"
-	models[2].Num = 203
-	models[2].Text = "STR3"
-	err = table.Update().Values(&models[1], &models[2]).Exec(ctx)
+	results[1].Num = 202
+	results[1].Text = "STR2"
+	results[2].Num = 203
+	results[2].Text = "STR3"
+	err = table.Update().Values(results[1], results[2]).Exec(ctx)
+	require.NoError(t, err)
+	// DELETE.
+	err = table.Delete().Values(results[3]).Exec(ctx)
 	require.NoError(t, err)
 }
