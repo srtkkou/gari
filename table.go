@@ -13,13 +13,13 @@ import (
 type (
 	// Table
 	Table struct {
-		gari      *Gari              // Pointer to gari config.
-		name      string             // Table name.
-		columns   []*column          // Slice of pointer to columns.
-		columnMap map[string]*column // Map of columns.
-		//pkey          *column            // Pointer to PRIMARY KEY column.
-		insertBuilder *insertBuilder // INSERT builder.
-		updateBuilder *updateBuilder // UPDATE builder.
+		gari          *Gari              // Pointer to gari config.
+		name          string             // Table name.
+		columns       []*column          // Slice of pointer to columns.
+		columnMap     map[string]*column // Map of columns.
+		pkey          *column            // Pointer to PRIMARY KEY column.
+		insertBuilder *insertBuilder     // INSERT builder.
+		updateBuilder *updateBuilder     // UPDATE builder.
 	}
 )
 

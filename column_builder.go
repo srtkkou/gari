@@ -19,10 +19,11 @@ type (
 )
 
 var (
-	ErrDefaultValueNull   = errors.New("gari.ErrDefaultValueNull")
-	ErrDefaultValueKind   = errors.New("gari.ErrDefaultValueKind")
-	ErrDefaultValueEncode = errors.New("gari.ErrDefaultValueEncode")
-	ErrDefaultValueSize   = errors.New("gari.ErrDefaultValueSize")
+	ErrMultiplePrimaryKeys = errors.New("gari.ErrMultiplePrimaryKeys")
+	ErrDefaultValueNull    = errors.New("gari.ErrDefaultValueNull")
+	ErrDefaultValueKind    = errors.New("gari.ErrDefaultValueKind")
+	ErrDefaultValueEncode  = errors.New("gari.ErrDefaultValueEncode")
+	ErrDefaultValueSize    = errors.New("gari.ErrDefaultValueSize")
 )
 
 // Initialize columnBuilder.
@@ -34,115 +35,125 @@ func newColumnBuilder(col *column) *columnBuilder {
 
 // Set field name.
 func FieldName(name string) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) error {
+	return setColumnOption(func(b *columnBuilder) {
 		b.column.fieldName = name
-		return nil
 	})
 }
 
 // Set primary key flag.
 func PrimaryKey(isAutoIncrement bool) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) error {
+	return setColumnOption(func(b *columnBuilder) {
 		b.column.primary = true
 		b.column.autoIncrement = isAutoIncrement
-		return nil
+		// Check if primary key is already set to table.
+		if b.column.table.pkey != nil {
+			b.err = errs.Wrap(ErrMultiplePrimaryKeys)
+			return
+		}
+		// Store pointer to this column.
+		b.column.table.pkey = b.column
 	})
 }
 
 // Set size of column.
 func Size(size int) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) error {
+	return setColumnOption(func(b *columnBuilder) {
 		b.column.size = size
-		return nil
 	})
 }
 
 // Set NOT NULL for column.
 func NotNull() ColumnOption {
-	return setColumnOption(func(b *columnBuilder) error {
+	return setColumnOption(func(b *columnBuilder) {
 		b.column.notNull = true
 		b.column.addRule(validation.Required)
-		return nil
 	})
 }
 
 // Set default value NULL.
 func DefaultNull() ColumnOption {
-	return setColumnOption(func(b *columnBuilder) error {
+	return setColumnOption(func(b *columnBuilder) {
 		if b.column.notNull {
-			return errs.Wrap(ErrDefaultValueNull,
+			b.err = errs.Wrap(ErrDefaultValueNull,
 				errs.WithContext("columnName", b.column.name),
 				errs.WithContext("notNull", b.column.notNull))
+			return
 		}
 		b.column.defaultValue = msgpackNil()
-		return nil
 	})
 }
 
 // Set default bool value.
 func DefaultBool(input bool) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) (err error) {
-		if err = b.validateKind(kindBool); err != nil {
-			return err
+	return setColumnOption(func(b *columnBuilder) {
+		if err := b.validateKind(kindBool); err != nil {
+			b.err = err
+			return
 		}
 		// Encode defalut bool value to msgpack.
-		b.column.defaultValue, err = encodeBool(input)
+		blob, err := encodeBool(input)
 		if err != nil {
-			return errs.Wrap(ErrDefaultValueEncode,
+			b.err = errs.Wrap(ErrDefaultValueEncode,
 				errs.WithCause(err),
 				errs.WithContext("columnName", b.column.name),
 				errs.WithContext("input", input))
+			return
 		}
-		return nil
+		b.column.defaultValue = blob
 	})
 }
 
 // Set default string value.
 func DefaultString(str string) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) (err error) {
-		if err = b.validateKind(kindString); err != nil {
-			return err
+	return setColumnOption(func(b *columnBuilder) {
+		if err := b.validateKind(kindString); err != nil {
+			b.err = err
+			return
 		}
 		// Validate field size.
 		if b.column.size < len(str) {
-			return errs.Wrap(ErrDefaultValueSize,
+			b.err = errs.Wrap(ErrDefaultValueSize,
 				errs.WithContext("columnName", b.column.name),
 				errs.WithContext("input", str),
 				errs.WithContext("size", b.column.size))
+			return
 		}
 		// Encode default string value to msgpack.
-		b.column.defaultValue, err = encodeString(str)
+		blob, err := encodeString(str)
 		if err != nil {
-			return errs.Wrap(ErrDefaultValueEncode,
+			b.err = errs.Wrap(ErrDefaultValueEncode,
 				errs.WithCause(err),
 				errs.WithContext("columnName", b.column.name),
 				errs.WithContext("input", str))
+			return
 		}
-		return nil
+		b.column.defaultValue = blob
 	})
 }
 
 // Set default int value.
 func DefaultInt64(num int64) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) (err error) {
-		if err = b.validateKind(kindInt64); err != nil {
-			return err
+	return setColumnOption(func(b *columnBuilder) {
+		if err := b.validateKind(kindInt64); err != nil {
+			b.err = err
+			return
 		}
 		// Encode default int64 value to msgpack.
-		b.column.defaultValue, err = encodeInt64(num)
+		blob, err := encodeInt64(num)
 		if err != nil {
-			return errs.Wrap(ErrDefaultValueEncode,
+			b.err = errs.Wrap(ErrDefaultValueEncode,
 				errs.WithCause(err),
 				errs.WithContext("columnName", b.column.name),
 				errs.WithContext("input", num))
+			return
 		}
-		return nil
+		b.column.defaultValue = blob
 	})
 }
 
 // Wrapper func to set column option.
 func setColumnOption(
-	fn func(b *columnBuilder) error,
+	fn func(b *columnBuilder),
 ) ColumnOption {
 	return func(b *columnBuilder) {
 		// Do nothing if columnBuilder has error.
@@ -150,9 +161,7 @@ func setColumnOption(
 			return
 		}
 		// Set column option.
-		if err := fn(b); err != nil {
-			b.err = err
-		}
+		fn(b)
 	}
 }
 

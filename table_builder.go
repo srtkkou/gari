@@ -1,11 +1,21 @@
 package gari
 
+import (
+	"errors"
+
+	"github.com/goark/errs"
+)
+
 type (
 	// Table builder.
 	TableBuilder struct {
 		table *Table // Pointer to table struct.
 		err   error  // Error.
 	}
+)
+
+var (
+	ErrNoPrimaryKey = errors.New("gari.ErrNoPrimaryKey")
 )
 
 // Add bool type column.
@@ -40,6 +50,12 @@ func (b *TableBuilder) AddInt64Column(
 func (b *TableBuilder) Define() (*Table, error) {
 	if b.err != nil {
 		return nil, b.err
+	}
+	// Check if primary key exists.
+	if b.table.pkey == nil {
+		err := errs.Wrap(ErrNoPrimaryKey)
+		b.gari().errorLog(err.Error())
+		return nil, err
 	}
 	return b.table, nil
 }
@@ -77,4 +93,8 @@ func (b *TableBuilder) addColumnWithKind(
 	// Add column to table.
 	b.table.addColumn(col)
 	return b
+}
+
+func (b *TableBuilder) gari() *Gari {
+	return b.table.gari
 }

@@ -21,7 +21,7 @@ type (
 		primary       bool              // Primary key.
 		autoIncrement bool              // Flag to set AUTOINCREMENT.
 		notNull       bool              // Flag to set NOT NULL.
-		defaultValue  []byte            // Default value of column.
+		defaultValue  encoded           // Default value of column.
 		rules         []validation.Rule // Validation rules.
 		ddlCache      string            //Cached DDL SQL statement.
 		//err           error             // Error
