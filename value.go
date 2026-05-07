@@ -2,6 +2,7 @@ package gari
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -12,8 +13,14 @@ import (
 type (
 	// Value to store DB value.
 	value struct {
-		column *column // Pointer to Column
-		blob   encoded // Encoded value
+		column    *column // Pointer to Column
+		blob      encoded // Encoded value
+		name      string
+		typeName  string
+		length    int64
+		precision int64
+		scale     int64
+		nullable  bool
 	}
 )
 
@@ -64,12 +71,16 @@ func (v *value) Scan(value any) (err error) {
 		err = errs.Wrap(ErrValueScan,
 			errs.WithContext("input", value))
 	}
-	v.gari().debugLog("value.Scan()",
-		slog.Any("input", value),
-		slog.Any("blob", v.blob),
-		slog.Any("err", err),
-		slog.String("columnName", v.column.name),
-		slog.String("kind", v.column.kind))
+	/*
+		v.gari().debugLog("value.Scan()",
+			slog.Any("input", value),
+			slog.Any("blob", v.blob),
+			slog.Any("err", err),
+			slog.String("columnName", v.column.name),
+			slog.String("kind", v.column.kind))
+	*/
+	fmt.Printf("value.Scan() input=%v(%T) blob=%#x err=%v\n",
+		value, value, v.blob, err)
 	return err
 }
 

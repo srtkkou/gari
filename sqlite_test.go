@@ -62,6 +62,11 @@ func TestSqlite(t *testing.T) {
 	}
 	err = table.Insert().Values(args...).Exec(ctx)
 	require.NoError(t, err)
+	// Raw SELECT.
+	err = gari.Select(
+		`SELECT id, created_at, updated_at, deleted_at, num, text FROM test_models ORDER BY id ASC;`,
+	).Exec(ctx)
+	require.NoError(t, err)
 	// SELECT.
 	results := make([]testModel, 0)
 	err = table.Select().OrderAsc("num").Exec(ctx, func(r *Record) {

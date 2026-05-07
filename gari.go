@@ -81,6 +81,11 @@ func (g *Gari) Table(name string) *TableBuilder {
 	return &b
 }
 
+// Execute SELECT SQL statement.
+func (g *Gari) Select(query string) *rawSelectExecutor {
+	return newRawSelectExecutor(g, query)
+}
+
 // Begin transaction.
 func (g *Gari) BeginTx() *txBuilder {
 	g.txBuilder = newTxBuilder(g)
