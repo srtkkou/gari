@@ -1,4 +1,4 @@
-package gari
+package gari_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	_ "github.com/glebarez/go-sqlite"
+	"github.com/srtkkou/gari"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,23 +27,25 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Initialize gari.
-	gari, err := Open(db)
-	gari.Debug = tLog(t)
-	gari.Info = tLog(t)
-	gari.Warn = tLog(t)
-	gari.Error = tLog(t)
+	g, err := gari.Open(db)
+	g.Debug = tLog(t)
+	g.Info = tLog(t)
+	g.Warn = tLog(t)
+	g.Error = tLog(t)
 	require.NoError(t, err)
-	defer gari.Close()
+	defer g.Close()
 	// Define table.
-	table, err := gari.Table("test_models").
-		Int64Column("id", PrimaryKey(true), NotNull()).
-		TimeColumn("created_at", NotNull()).
-		TimeColumn("updated_at", NotNull()).
-		TimeColumn("deleted_at", DefaultNull()).
+	table, err := g.Table("test_models").
+		Int64Column("id",
+			gari.PrimaryKey(true), gari.NotNull()).
+		TimeColumn("created_at", gari.NotNull()).
+		TimeColumn("updated_at", gari.NotNull()).
+		TimeColumn("deleted_at", gari.DefaultNull()).
 		Int64Column("num",
-			NotNull(), DefaultInt64(0)).
+			gari.NotNull(), gari.DefaultInt64(0)).
 		StringColumn("text",
-			NotNull(), Length(255), DefaultString("DEFAULT")).
+			gari.NotNull(), gari.Length(255),
+			gari.DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
 	// Migrate.
@@ -63,15 +66,15 @@ func TestSqlite(t *testing.T) {
 	err = table.Insert().Values(args...).Exec(ctx)
 	require.NoError(t, err)
 	// Raw SELECT.
-	err = gari.Select(
+	err = g.Select(
 		`SELECT id, created_at, updated_at, deleted_at, num, text FROM test_models ORDER BY id ASC;`,
-	).Exec(ctx, func(r *Record) {
+	).Exec(ctx, func(r *gari.Record) {
 		t.Logf("record=%s\n", r)
 	})
 	require.NoError(t, err)
 	// SELECT.
 	results := make([]testModel, 0)
-	err = table.Select().OrderAsc("num").Exec(ctx, func(r *Record) {
+	err = table.Select().OrderAsc("num").Exec(ctx, func(r *gari.Record) {
 		m := testModel{}
 		r.SetInt("id", &m.Id)
 		r.SetTime("created_at", &m.CreatedAt)
@@ -99,4 +102,11 @@ func TestSqlite(t *testing.T) {
 	// DELETE.
 	err = table.Delete().Values(&results[3]).Exec(ctx)
 	require.NoError(t, err)
+}
+
+// Define logger.
+func tLog(t *testing.T) func(string, ...any) {
+	return func(msg string, args ...any) {
+		t.Log(append([]any{msg}, args...))
+	}
 }
