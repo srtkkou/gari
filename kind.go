@@ -4,9 +4,10 @@ package gari
 type kind = string
 
 const (
-	kindNull   = kind("Null")
-	kindBool   = kind("Bool")
-	kindString = kind("String")
-	kindTime   = kind("Time")
-	kindInt64  = kind("Int64")
+	kindInvalid = kind("Invalid")
+	kindBool    = kind("Bool") // TODO: Remove
+	kindString  = kind("String")
+	kindTime    = kind("Time")
+	kindInt64   = kind("Int64")
+	kindFloat64 = kind("Float64")
 )
