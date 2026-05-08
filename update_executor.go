@@ -41,7 +41,7 @@ func newUpdateExecutor(t *Table) *updateExecutor {
 	}
 	// Set columns except primary key column.
 	for _, col := range t.columns {
-		if col.primary {
+		if col.isPrimary {
 			continue
 		}
 		e.columns = append(e.columns, col)

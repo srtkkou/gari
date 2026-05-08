@@ -42,7 +42,7 @@ func newInsertExecutor(t *Table) *insertExecutor {
 	// Initialize columns.
 	for _, col := range t.columns {
 		// Skip primary key.
-		if col.primary {
+		if col.isPrimary {
 			continue
 		}
 		e.columns = append(e.columns, col)
