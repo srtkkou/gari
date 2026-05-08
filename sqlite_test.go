@@ -66,8 +66,7 @@ func TestSqlite(t *testing.T) {
 	err = gari.Select(
 		`SELECT id, created_at, updated_at, deleted_at, num, text FROM test_models ORDER BY id ASC;`,
 	).Exec(ctx, func(r *Record) {
-		t.Logf("record.columnNames=%v\n", r.ColumnNames())
-		t.Logf("record.fieldNames=%v\n", r.FieldNames())
+		t.Logf("record=%s\n", r)
 	})
 	require.NoError(t, err)
 	// SELECT.
@@ -95,9 +94,9 @@ func TestSqlite(t *testing.T) {
 	results[1].Text = "STR2"
 	results[2].Num = 203
 	results[2].Text = "STR3"
-	err = table.Update().Values(results[1], results[2]).Exec(ctx)
+	err = table.Update().Values(&results[1], &results[2]).Exec(ctx)
 	require.NoError(t, err)
 	// DELETE.
-	err = table.Delete().Values(results[3]).Exec(ctx)
+	err = table.Delete().Values(&results[3]).Exec(ctx)
 	require.NoError(t, err)
 }
