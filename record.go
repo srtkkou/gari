@@ -34,16 +34,6 @@ func (r *Record) ColumnNames() []string {
 	return names
 }
 
-/*
-func (r *Record) FullColumnNames() []string {
-	names := make([]string, len(r.values))
-	for i, value := range r.values {
-		names[i] = value.column.fullName()
-	}
-	return names
-}
-*/
-
 func (r *Record) FieldNames() []string {
 	names := make([]string, len(r.values))
 	for i, value := range r.values {
@@ -54,97 +44,58 @@ func (r *Record) FieldNames() []string {
 
 func (r *Record) SetNullString(name string, ptr *sql.NullString) {
 	if value, ok := r.m[name]; ok {
-		//if value.kind == kindString && value.nullable {
 		if ns, ok := value.raw.(sql.NullString); ok {
 			*ptr = ns
 		}
-		/*
-			if ns, err := decodeNullString(value.blob); err == nil {
-				*ptr = ns
-			}
-		*/
-		//}
 	}
 }
 
 func (r *Record) SetString(name string, ptr *string) {
 	if value, ok := r.m[name]; ok {
-		//if value.kind == kindString && !value.nullable {
 		if str, ok := value.raw.(string); ok {
 			*ptr = str
 		}
-		/*
-			if ns, err := decodeNullString(value.blob); err == nil {
-				if ns.Valid {
-					*ptr = ns.String
-				}
-			}
-		*/
-		//}
 	}
 }
 
 func (r *Record) SetNullTime(name string, ptr *sql.NullTime) {
 	if value, ok := r.m[name]; ok {
-		//if value.kind == kindTime && value.nullable {
 		if nt, ok := value.raw.(sql.NullTime); ok {
 			*ptr = nt
 		}
-		/*
-			if nt, err := decodeNullTime(value.blob); err == nil {
-				*ptr = nt
-			}
-		*/
-		//}
 	}
 }
 
 func (r *Record) SetTime(name string, ptr *time.Time) {
 	if value, ok := r.m[name]; ok {
-		//if value.kind == kindTime && !value.nullable {
 		if tm, ok := value.raw.(time.Time); ok {
 			*ptr = tm
 		}
-		/*
-			if nt, err := decodeNullTime(value.blob); err == nil {
-				if nt.Valid {
-					*ptr = nt.Time
-				}
-			}
-		*/
-		//}
 	}
 }
 
 func (r *Record) SetNullInt64(name string, ptr *sql.NullInt64) {
 	if value, ok := r.m[name]; ok {
-		//if value.kind == kindInt64 && value.nullable {
 		if ni, ok := value.raw.(sql.NullInt64); ok {
 			*ptr = ni
 		}
-		/*
-			if ni, err := decodeNullInt64(value.blob); err == nil {
-				*ptr = ni
-			}
-		*/
-		//}
 	}
 }
 
 func (r *Record) SetInt64(name string, ptr *int64) {
 	if value, ok := r.m[name]; ok {
-		//if value.kind == kindInt64 && !value.nullable {
-		if num, ok := value.raw.(int64); ok {
-			*ptr = num
+		switch tv := value.raw.(type) {
+		case int:
+			*ptr = int64(tv)
+		case int8:
+			*ptr = int64(tv)
+		case int16:
+			*ptr = int64(tv)
+		case int32:
+			*ptr = int64(tv)
+		case int64:
+			*ptr = tv
 		}
-		/*
-			if ni, err := decodeNullInt64(value.blob); err == nil {
-				if ni.Valid {
-					*ptr = ni.Int64
-				}
-			}
-		*/
-		//}
 	}
 }
 
