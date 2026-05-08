@@ -11,6 +11,7 @@ import (
 type (
 	// Value to store DB value.
 	value struct {
+		tableName  string // Table name.
 		columnName string // Column name.
 		fieldName  string // Golang struct field name.
 		kind       kind   // Kind.
@@ -30,6 +31,7 @@ var (
 // Create new Value struct by *column.
 func newValueByColumn(col *column) *value {
 	v := &value{}
+	v.tableName = col.table.name
 	v.columnName = col.name
 	v.fieldName = col.fieldName
 	v.kind = col.kind
@@ -44,7 +46,15 @@ func newValueByColumn(col *column) *value {
 // Create new Value struct by *column.
 func newValueByColumnType(t *sql.ColumnType) *value {
 	v := &value{}
-	v.columnName = t.Name()
+	// Split name to table and column.
+	tokens := strings.Split(t.Name(), ".")
+	if len(tokens) == 1 {
+		v.tableName = "unknown"
+		v.columnName = tokens[0]
+	} else {
+		v.tableName = tokens[0]
+		v.columnName = tokens[len(tokens)-1]
+	}
 	v.fieldName = snakeToUpperCamelCase(v.columnName)
 	v.dbType = t.DatabaseTypeName()
 	switch strings.ToUpper(v.dbType) {
@@ -74,6 +84,8 @@ func newValueByColumnType(t *sql.ColumnType) *value {
 func (v *value) String() string {
 	var sb strings.Builder
 	sb.WriteString(`{"type":"gari.value"`)
+	sb.WriteString(`,"tableName":`)
+	sb.WriteString(strconv.Quote(v.tableName))
 	sb.WriteString(`,"columnName":`)
 	sb.WriteString(strconv.Quote(v.columnName))
 	sb.WriteString(`,"fieldName":`)
