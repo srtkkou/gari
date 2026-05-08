@@ -101,6 +101,15 @@ func (g *Gari) quoteIdentifier(identifier string) string {
 	return sb.String()
 }
 
+// Quote string.
+func (g *Gari) quoteString(str string) string {
+	var sb strings.Builder
+	sb.WriteString(g.stringQuote)
+	sb.WriteString(str)
+	sb.WriteString(g.stringQuote)
+	return sb.String()
+}
+
 // Get placeholder.
 // TODO: It should return $1,$2... for postgres.
 func (g *Gari) placeholder(i int) string {
