@@ -5,7 +5,6 @@ type kind = string
 
 const (
 	kindInvalid = kind("Invalid")
-	kindBool    = kind("Bool") // TODO: Remove
 	kindString  = kind("String")
 	kindTime    = kind("Time")
 	kindInt64   = kind("Int64")

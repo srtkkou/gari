@@ -22,8 +22,8 @@ func TestTableBuilder(t *testing.T) {
 			NotNull(), Length(32), DefaultString("")).
 		TimeColumn("created_at",
 			DefaultNull()).
-		BoolColumn("ok",
-			NotNull(), DefaultBool(false)).
+		Int64Column("num",
+			NotNull(), DefaultInt64(123)).
 		Define()
 	require.NoError(t, err)
 	require.NotNil(t, table)

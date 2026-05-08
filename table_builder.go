@@ -18,13 +18,6 @@ var (
 	ErrNoPrimaryKey = errors.New("gari.ErrNoPrimaryKey")
 )
 
-// Add bool type column.
-func (b *TableBuilder) BoolColumn(
-	name string, opts ...ColumnOption,
-) *TableBuilder {
-	return b.addColumnWithKind(name, kindBool, opts)
-}
-
 // Add string type column.
 func (b *TableBuilder) StringColumn(
 	name string, opts ...ColumnOption,

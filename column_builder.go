@@ -82,18 +82,6 @@ func DefaultNull() ColumnOption {
 	})
 }
 
-// Set default bool value.
-func DefaultBool(input bool) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) {
-		if err := b.validateKind(kindBool); err != nil {
-			b.err = err
-			return
-		}
-		b.column.defaultExists = true
-		b.column.defaultValue = input
-	})
-}
-
 // Set default string value.
 func DefaultString(str string) ColumnOption {
 	return setColumnOption(func(b *columnBuilder) {

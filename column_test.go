@@ -7,19 +7,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestColumnDefaultBool(t *testing.T) {
+func TestColumnDefaultString(t *testing.T) {
 	tests := []struct {
 		name  string
-		input bool
-		//want any
+		input string
 	}{
 		{
-			name:  "OK:true",
-			input: true,
+			name:  "OK:string",
+			input: "abcd",
 		},
 		{
-			name:  "OK:false",
-			input: false,
+			name:  "OK:empty string",
+			input: "",
 		},
 	}
 	for _, test := range tests {
@@ -33,12 +32,12 @@ func TestColumnDefaultBool(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			table, err := g.Table("test").
 				Int64Column("id", PrimaryKey(true), NotNull()).
-				BoolColumn("is_ok", DefaultBool(test.input)).
+				StringColumn("text", DefaultString(test.input)).
 				Define()
 			require.NoError(t, err)
-			col := table.column("is_ok")
+			col := table.column("text")
 			require.NotNil(t, col)
-			require.NotEmpty(t, col.defaultValue)
+			require.Equal(t, test.input, col.defaultValue)
 		})
 	}
 }
