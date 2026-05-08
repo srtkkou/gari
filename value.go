@@ -1,26 +1,25 @@
 package gari
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
+	"strconv"
 	"strings"
-	"time"
-
-	"github.com/goark/errs"
 )
 
 type (
 	// Value to store DB value.
 	value struct {
-		column    *column // Pointer to Column
-		blob      encoded // Encoded value
-		name      string
-		typeName  string
-		length    int64
-		precision int64
-		scale     int64
-		nullable  bool
+		columnName string // Column name.
+		fieldName  string // Golang struct field name.
+		kind       kind   // Kind.
+		dbType     string // DB type name.
+		length     int64  // Length of DB column.
+		precision  int64  // Decimal precision of DB column.
+		scale      int64  // Decimal scale of DB column.
+		nullable   bool   // Allow nil for DB column.
+		raw        any    // Raw value.
 	}
 )
 
@@ -28,95 +27,85 @@ var (
 	ErrValueScan = errors.New("gari.ErrValueScan")
 )
 
-// Create new Value struct.
-func newValue(col *column) *value {
-	v := value{
-		column: col,
-		blob:   []byte{},
-	}
-	return &v
+// Create new Value struct by *column.
+func newValueByColumn(col *column) *value {
+	v := &value{}
+	v.columnName = col.name
+	v.fieldName = col.fieldName
+	v.kind = col.kind
+	// TODO: Set real DB type.
+	v.dbType = "TMP"
+	v.length = int64(col.size)
+	v.precision = int64(0)
+	v.scale = int64(0)
+	// TODO: Rename to col.nullable.
+	v.nullable = !col.notNull
+	return v
 }
 
-// String
-func (c *value) String() string {
-	var b strings.Builder
-	b.WriteString(`{"blob":"`)
-	b.WriteString(c.column.kind)
-	b.WriteString(`", "column":`)
-	b.WriteString(c.column.String())
-	b.WriteString(`}`)
-	return b.String()
-}
-
-// Scan value into Value struct.
-func (v *value) Scan(value any) (err error) {
-	switch tv := value.(type) {
-	case nil:
-		v.blob = msgpackNil()
-	case string:
-		v.blob, err = encodeString(tv)
-	case time.Time:
-		v.blob, err = encodeTime(tv)
-	case int:
-		v.blob, err = encodeInt64(int64(tv))
-	case int8:
-		v.blob, err = encodeInt64(int64(tv))
-	case int16:
-		v.blob, err = encodeInt64(int64(tv))
-	case int32:
-		v.blob, err = encodeInt64(int64(tv))
-	case int64:
-		v.blob, err = encodeInt64(tv)
+// Create new Value struct by *column.
+func newValueByColumnType(t *sql.ColumnType) *value {
+	v := &value{}
+	v.columnName = t.Name()
+	v.fieldName = snakeToUpperCamelCase(v.columnName)
+	v.dbType = t.DatabaseTypeName()
+	switch strings.ToUpper(v.dbType) {
+	case "VARCHAR", "TEXT":
+		v.kind = kindString
+	case "DATE", "TIME", "DATETIME", "TIMESTAMP":
+		v.kind = kindTime
+	case "INTEGER", "INT":
+		v.kind = kindInt64
 	default:
-		err = errs.Wrap(ErrValueScan,
-			errs.WithContext("input", value))
+		v.kind = kindInvalid
 	}
-	/*
-		v.gari().debugLog("value.Scan()",
-			slog.Any("input", value),
-			slog.Any("blob", v.blob),
-			slog.Any("err", err),
-			slog.String("columnName", v.column.name),
-			slog.String("kind", v.column.kind))
-	*/
-	fmt.Printf("value.Scan() input=%v(%T) blob=%#x err=%v\n",
-		value, value, v.blob, err)
+	if length, ok := t.Length(); ok {
+		v.length = length
+	}
+	if precision, scale, ok := t.DecimalSize(); ok {
+		v.precision = precision
+		v.scale = scale
+	}
+	if nullable, ok := t.Nullable(); ok {
+		v.nullable = nullable
+	}
+	return v
+}
+
+// Convert to JSON string.
+func (v *value) String() string {
+	var sb strings.Builder
+	sb.WriteString(`{"type":"gari.value",`)
+	sb.WriteString(`"columnName":`)
+	sb.WriteString(strconv.Quote(v.columnName))
+	sb.WriteString(`,"fieldName":`)
+	sb.WriteString(strconv.Quote(v.fieldName))
+	sb.WriteString(`,"kind":`)
+	sb.WriteString(strconv.Quote(v.kind))
+	sb.WriteString(`,"dbType":`)
+	sb.WriteString(strconv.Quote(v.dbType))
+	sb.WriteString(`,"length":`)
+	sb.WriteString(strconv.FormatInt(v.length, 10))
+	sb.WriteString(`,"precision":`)
+	sb.WriteString(strconv.FormatInt(v.precision, 10))
+	sb.WriteString(`,"scale":`)
+	sb.WriteString(strconv.FormatInt(v.scale, 10))
+	sb.WriteString(`,"nullable":`)
+	sb.WriteString(strconv.FormatBool(v.nullable))
+	sb.WriteString(`,"raw":`)
+	raw := fmt.Sprintf("%v(%T)", v.raw, v.raw)
+	sb.WriteString(strconv.Quote(raw))
+	sb.WriteString(`}`)
+	return sb.String()
+}
+
+// Scan DB value into value struct.
+func (v *value) Scan(value any) (err error) {
+	v.raw = value
 	return err
 }
 
 // Convert to SQL argument value.
-func (v *value) arg() (result any) {
-	result = nil
-	switch v.column.kind {
-	case kindBool:
-		nb, err := decodeNullBool(v.blob)
-		if err == nil && nb.Valid {
-			result = nb.Bool
-		}
-	case kindString:
-		ns, err := decodeNullString(v.blob)
-		if err == nil && ns.Valid {
-			result = ns.String
-		}
-	case kindTime:
-		nt, err := decodeNullTime(v.blob)
-		if err == nil && nt.Valid {
-			result = nt.Time
-		}
-	case kindInt64:
-		ni, err := decodeNullInt64(v.blob)
-		if err == nil && ni.Valid {
-			result = ni.Int64
-		}
-	}
-	v.gari().debugLog("value.arg()",
-		slog.Any("blob", v.blob),
-		slog.Any("result", result),
-		slog.String("columnName", v.column.name),
-		slog.String("kind", v.column.kind))
-	return result
-}
-
-func (v *value) gari() *Gari {
-	return v.column.table.gari
+func (v *value) arg() any {
+	return v.raw
 }
