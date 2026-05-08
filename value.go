@@ -18,7 +18,7 @@ type (
 		length     int64  // Length of DB column.
 		precision  int64  // Decimal precision of DB column.
 		scale      int64  // Decimal scale of DB column.
-		nullable   bool   // Allow nil for DB column.
+		isNullable bool   // Allow nil for DB column.
 		raw        any    // Raw value.
 	}
 )
@@ -33,13 +33,11 @@ func newValueByColumn(col *column) *value {
 	v.columnName = col.name
 	v.fieldName = col.fieldName
 	v.kind = col.kind
-	// TODO: Set real DB type.
-	v.dbType = "TMP"
-	v.length = int64(col.size)
-	v.precision = int64(0)
-	v.scale = int64(0)
-	// TODO: Rename to col.nullable.
-	v.nullable = !col.notNull
+	v.dbType = col.dbType
+	v.length = col.length
+	v.precision = col.precision
+	v.scale = col.scale
+	v.isNullable = col.isNullable
 	return v
 }
 
@@ -66,8 +64,8 @@ func newValueByColumnType(t *sql.ColumnType) *value {
 		v.precision = precision
 		v.scale = scale
 	}
-	if nullable, ok := t.Nullable(); ok {
-		v.nullable = nullable
+	if isNullable, ok := t.Nullable(); ok {
+		v.isNullable = isNullable
 	}
 	return v
 }
@@ -75,8 +73,8 @@ func newValueByColumnType(t *sql.ColumnType) *value {
 // Convert to JSON string.
 func (v *value) String() string {
 	var sb strings.Builder
-	sb.WriteString(`{"type":"gari.value",`)
-	sb.WriteString(`"columnName":`)
+	sb.WriteString(`{"type":"gari.value"`)
+	sb.WriteString(`,"columnName":`)
 	sb.WriteString(strconv.Quote(v.columnName))
 	sb.WriteString(`,"fieldName":`)
 	sb.WriteString(strconv.Quote(v.fieldName))
@@ -90,8 +88,8 @@ func (v *value) String() string {
 	sb.WriteString(strconv.FormatInt(v.precision, 10))
 	sb.WriteString(`,"scale":`)
 	sb.WriteString(strconv.FormatInt(v.scale, 10))
-	sb.WriteString(`,"nullable":`)
-	sb.WriteString(strconv.FormatBool(v.nullable))
+	sb.WriteString(`,"isNullable":`)
+	sb.WriteString(strconv.FormatBool(v.isNullable))
 	sb.WriteString(`,"raw":`)
 	raw := fmt.Sprintf("%v(%T)", v.raw, v.raw)
 	sb.WriteString(strconv.Quote(raw))
