@@ -14,9 +14,10 @@ import (
 type (
 	// Executor to run SELECT SQL.
 	selectExecutor struct {
-		from   *Table // Main table to select from.
-		values []*value
-		err    error // Error.
+		from    *Table // Main table to select from.
+		columns []*column
+		values  []*value
+		err     error // Error.
 
 		//		joins  []join  // JOIN statements.
 		orders []order // ORDER BY statements.
@@ -39,21 +40,28 @@ type (
 var (
 	ErrOrderColumnNotFound = errors.New("ErrOrderColumnNotFound")
 	ErrSelectExec          = errors.New("gari.ErrSelectExec")
+	ErrSelectColumnTypes   = errors.New("gari.ErrSelectColumnTypes")
+	ErrSelectScan          = errors.New("gari.ErrSelectScan")
 )
 
 // Create new selectExecutor.
 func newSelectExecutor(t *Table) *selectExecutor {
 	e := selectExecutor{
-		from:   t,
-		values: make([]*value, len(t.columns)),
+		from:    t,
+		columns: make([]*column, 0, len(t.columns)),
+		//values:  make([]*value, len(t.columns)),
 		orders: make([]order, 0),
 		offset: -1,
 		limit:  -1,
 	}
-	// Initialize values from columns.
-	for i, col := range t.columns {
-		e.values[i] = newValue(col)
-	}
+	// Copy columns from table.
+	e.columns = append(e.columns, t.columns...)
+	/*
+		// Initialize values from columns.
+		for i, col := range t.columns {
+			e.values[i] = newValueByColumn(col)
+		}
+	*/
 	return &e
 }
 
@@ -90,18 +98,34 @@ func (e *selectExecutor) Exec(
 		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 	defer rows.Close()
+	// Get column types from sql.Rows.
+	types, err := rows.ColumnTypes()
+	if err != nil {
+		e.err = errs.Wrap(ErrSelectColumnTypes,
+			errs.WithCause(err),
+			errs.WithContext("query", query))
+		e.gari().errorLog(e.err.Error())
+		return e.err
+	}
+	// Build args.
+	args := make([]any, len(types))
+	values := make([]*value, len(types))
+	for i, t := range types {
+		v := newValueByColumnType(t)
+		values[i] = v
+		args[i] = v
+	}
 	// Scan rows.
 	count := 0
 	for rows.Next() {
 		// Count up.
 		count += 1
 		// Scan values.
-		args := make([]any, len(e.values))
-		for i := range args {
-			args[i] = e.values[i]
-		}
 		err = rows.Scan(args...)
 		if err != nil {
+			err = errs.Wrap(ErrSelectScan, errs.WithCause(err),
+				errs.WithContext("query", query))
+			e.gari().errorLog(err.Error())
 			return err
 		}
 		// Pass Record to func.
@@ -119,14 +143,14 @@ func (e *selectExecutor) Exec(
 func (e *selectExecutor) buildQuery() string {
 	tokens := []string{"SELECT"}
 	// Column names to select..
-	for i, value := range e.values {
+	for i, column := range e.columns {
 		// Column name.
-		name := value.column.quotedFullName()
+		name := column.quotedFullName()
 		tokens = append(tokens, name)
 		// Alias.
-		alias := value.column.fullName()
+		alias := column.fullName()
 		alias = e.gari().quoteIdentifier(alias)
-		if i < (len(e.values) - 1) {
+		if i < (len(e.columns) - 1) {
 			alias += ","
 		}
 		tokens = append(tokens, "AS", alias)

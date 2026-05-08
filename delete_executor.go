@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/goark/errs"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
@@ -25,9 +24,8 @@ type (
 
 var (
 	ErrDeletePrepare      = errors.New("gari.ErrDeletePrepare")
-	ErrDeleteValuesEncode = errors.New("gari.ErrDeleteValuesEncode")
-	ErrDeleteValuesDecode = errors.New("gari.ErrDeleteValuesDecode")
-	ErrDeleteRecordsEmpty = errors.New("gari.ErrDeleteRecordsEmpty")
+	ErrDeleteValuePtr     = errors.New("gari.ErrDeleteValuePtr")
+	ErrDeleteNoRecords    = errors.New("gari.ErrDeleteNoRecords")
 	ErrDeleteExec         = errors.New("gari.ErrDeleteExec")
 	ErrDeleteRowsAffected = errors.New("gari.ErrDeleteRowsAffected")
 	ErrDeleteRowCount     = errors.New("gari.ErrDeleteRowCount")
@@ -50,27 +48,19 @@ func (e *deleteExecutor) Values(ptrs ...any) *deleteExecutor {
 		return e
 	}
 	for _, ptr := range ptrs {
-		// Convert to msgpack.
-		blob, err := msgpack.Marshal(ptr)
+		// Build map of values from pointer to struct.
+		m, err := structPtrToMap(ptr)
 		if err != nil {
-			e.err = errs.Wrap(ErrDeleteValuesEncode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrDeleteValuePtr,
+				errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			e.gari().errorLog(e.err.Error())
-			return e
-		}
-		// Unmarshal msgpack to map[string]encoded.
-		m, err := splitToMap(blob)
-		if err != nil {
-			e.err = errs.Wrap(ErrDeleteValuesDecode, errs.WithCause(err),
-				errs.WithContext("ptr", ptr),
-				errs.WithContext("msgpack", blob))
 			e.gari().errorLog(e.err.Error())
 			return e
 		}
 		// Build record.
 		values := make([]*value, 1)
-		values[0] = newValue(e.table.pkey)
-		values[0].blob = m[e.table.pkey.fieldName]
+		values[0] = newValueByColumn(e.table.pkey)
+		values[0].raw = m[e.table.pkey.fieldName]
 		r := newRecord(values)
 		e.records = append(e.records, r)
 	}
@@ -88,13 +78,14 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 	}
 	// Check if records are not empty.
 	if len(e.records) == 0 {
-		e.err = errs.Wrap(ErrDeleteRecordsEmpty,
-			errs.WithContext("query", e.query))
+		e.err = errs.Wrap(ErrDeleteNoRecords,
+			errs.WithContext("query", e.query),
+			errs.WithContext("records", 0))
 		e.gari().errorLog(e.err.Error())
 		return e.err
 	}
 	for _, r := range e.records {
-		// TODO:BEFORE UPDATE
+		// TODO:BEFORE DELETE
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
@@ -129,7 +120,7 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// TODO:AFTER UPDATE
+		// TODO:AFTER DELETE
 	}
 	return nil
 }
@@ -155,7 +146,7 @@ func (e *deleteExecutor) buildQuery() string {
 	return strings.Join(tokens, " ")
 }
 
-// Prepare UPDATE SQL statement.
+// Prepare DELETE SQL statement.
 func (e *deleteExecutor) prepareStmt() {
 	startedAt := time.Now()
 	var err error

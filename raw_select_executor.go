@@ -3,7 +3,6 @@ package gari
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -21,9 +20,10 @@ type (
 )
 
 var (
-	ErrRawSelectExec = errors.New("gari.ErrRawSelectExec")
-	ErrRawSelectScan = errors.New("gari.ErrRawSelectScan")
-	ErrRawSelectRows = errors.New("gari.ErrRawSelectRows")
+	ErrRawSelectExec        = errors.New("gari.ErrRawSelectExec")
+	ErrRawSelectScan        = errors.New("gari.ErrRawSelectScan")
+	ErrRawSelectRows        = errors.New("gari.ErrRawSelectRows")
+	ErrRawSelectColumnTypes = errors.New("gari.ErrRawSelectColumnTypes")
 )
 
 // Create new selectExecutor.
@@ -39,7 +39,7 @@ func newRawSelectExecutor(g *Gari, query string) *rawSelectExecutor {
 
 // Execute SELECT SQL query.
 func (e *rawSelectExecutor) Exec(
-	ctx context.Context,
+	ctx context.Context, fn func(r *Record),
 ) error {
 	if e.err != nil {
 		return e.err
@@ -48,7 +48,7 @@ func (e *rawSelectExecutor) Exec(
 	startedAt := time.Now()
 	rows, err := e.gari.db.QueryContext(ctx, e.query)
 	if err != nil {
-		e.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
+		e.err = errs.Wrap(ErrRawSelectExec, errs.WithCause(err),
 			errs.WithContext("query", e.query),
 			errs.WithContext("duration", time.Since(startedAt)))
 		e.gari.errorLog(e.err.Error())
@@ -58,42 +58,29 @@ func (e *rawSelectExecutor) Exec(
 		slog.String("query", e.query),
 		slog.Duration("duration", time.Since(startedAt)))
 	defer rows.Close()
-	// Build args.
-	fmt.Println("rawSelectExecutor.Exec() Get types")
+	// Get column types from sql.Rows.
 	types, err := rows.ColumnTypes()
 	if err != nil {
-		e.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
+		e.err = errs.Wrap(ErrRawSelectColumnTypes,
+			errs.WithCause(err),
 			errs.WithContext("query", e.query))
 		e.gari.errorLog(e.err.Error())
 		return e.err
 	}
-	fmt.Println("rawSelectExecutor.Exec() Get types DONE")
+	// Build args.
 	args := make([]any, len(types))
 	values := make([]*value, len(types))
-	for i := range values {
-		length, _ := types[i].Length()
-		precision, scale, _ := types[i].DecimalSize()
-		nullable, _ := types[i].Nullable()
-		v := &value{
-			name:      types[i].Name(),
-			typeName:  types[i].DatabaseTypeName(),
-			length:    length,
-			precision: precision,
-			scale:     scale,
-			nullable:  nullable,
-		}
-		e.gari.debugLog(fmt.Sprintf("value name=%s type=%s length=%d precision=%d scale=%d nullable=%v", v.name, v.typeName, v.length, v.precision, v.scale, v.nullable))
+	for i, t := range types {
+		v := newValueByColumnType(t)
 		values[i] = v
 		args[i] = v
 	}
-	fmt.Println("rawSelectExecutor.Exec() init args DONE")
 	// Scan rows.
 	count := 0
 	for rows.Next() {
 		// Count up.
 		count += 1
 		// Scan values.
-		fmt.Println("rawSelectExecutor.Exec() rows.Scan")
 		err = rows.Scan(args...)
 		if err != nil {
 			err = errs.Wrap(ErrRawSelectScan, errs.WithCause(err),
@@ -101,7 +88,9 @@ func (e *rawSelectExecutor) Exec(
 			e.gari.errorLog(err.Error())
 			return err
 		}
-		fmt.Println("rawSelectExecutor.Exec() rows.Scan DONE")
+		// Pass Record to func.
+		r := newRecord(values)
+		fn(r)
 	}
 	// Check error
 	if rows.Err() != nil {

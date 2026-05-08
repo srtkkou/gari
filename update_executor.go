@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/goark/errs"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
@@ -26,9 +25,8 @@ type (
 
 var (
 	ErrUpdatePrepare      = errors.New("gari.ErrUpdatePrepare")
-	ErrUpdateValuesEncode = errors.New("gari.ErrUpdateValuesEncode")
-	ErrUpdateValuesDecode = errors.New("gari.ErrUpdateValuesDecode")
-	ErrUpdateRecordsEmpty = errors.New("gari.ErrUpdateRecordsEmpty")
+	ErrUpdateValuePtr     = errors.New("gari.ErrUpdateValuePtr")
+	ErrUpdateNoRecords    = errors.New("gari.ErrUpdateNoRecords")
 	ErrUpdateExec         = errors.New("gari.ErrUpdateExec")
 	ErrUpdateRowsAffected = errors.New("gari.ErrUpdateRowsAffected")
 	ErrUpdateRowCount     = errors.New("gari.ErrUpdateRowCount")
@@ -61,32 +59,22 @@ func (e *updateExecutor) Values(ptrs ...any) *updateExecutor {
 	// Copy columns and add primary key column to end.
 	columns := make([]*column, 0, len(e.columns)+1)
 	columns = append(columns, e.columns...)
-	// TODO: Fix to use non-id named pkey column.
-	pkeyCol := e.table.column("id")
-	columns = append(columns, pkeyCol)
+	columns = append(columns, e.table.pkey)
 	for _, ptr := range ptrs {
-		// Convert to msgpack.
-		blob, err := msgpack.Marshal(ptr)
+		// Build map of values from pointer to struct.
+		m, err := structPtrToMap(ptr)
 		if err != nil {
-			e.err = errs.Wrap(ErrUpdateValuesEncode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrUpdateValuePtr,
+				errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
-			e.gari().errorLog(e.err.Error())
-			return e
-		}
-		// Unmarshal msgpack to map[string]encoded.
-		m, err := splitToMap(blob)
-		if err != nil {
-			e.err = errs.Wrap(ErrUpdateValuesDecode, errs.WithCause(err),
-				errs.WithContext("ptr", ptr),
-				errs.WithContext("msgpack", blob))
 			e.gari().errorLog(e.err.Error())
 			return e
 		}
 		// Build record.
 		values := make([]*value, len(columns))
 		for i, col := range columns {
-			values[i] = newValue(col)
-			values[i].blob = m[col.fieldName]
+			values[i] = newValueByColumn(col)
+			values[i].raw = m[col.fieldName]
 		}
 		r := newRecord(values)
 		e.records = append(e.records, r)
@@ -105,8 +93,9 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 	}
 	// Check if records are not empty.
 	if len(e.records) == 0 {
-		e.err = errs.Wrap(ErrUpdateRecordsEmpty,
-			errs.WithContext("query", e.query))
+		e.err = errs.Wrap(ErrUpdateNoRecords,
+			errs.WithContext("query", e.query),
+			errs.WithContext("records", 0))
 		e.gari().errorLog(e.err.Error())
 		return e.err
 	}

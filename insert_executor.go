@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/goark/errs"
-	"github.com/vmihailenco/msgpack/v5"
 )
 
 type (
@@ -26,9 +25,8 @@ type (
 
 var (
 	ErrInsertPrepare      = errors.New("gari.ErrInsertPrepare")
-	ErrInsertValuesEncode = errors.New("gari.ErrInsertValuesEncode")
-	ErrInsertValuesDecode = errors.New("gari.ErrInsertValuesDecode")
-	ErrInsertRecordsEmpty = errors.New("gari.ErrInsertRecordsEmpty")
+	ErrInsertValuePtr     = errors.New("gari.ErrInsertValuePtr")
+	ErrInsertNoRecords    = errors.New("gari.ErrInsertNoRecords")
 	ErrInsertExec         = errors.New("gari.ErrInsertExec")
 	ErrInsertRowsAffected = errors.New("gari.ErrInsertRowsAffected")
 	ErrInsertRowCount     = errors.New("gari.ErrInsertRowCount")
@@ -60,27 +58,20 @@ func (e *insertExecutor) Values(ptrs ...any) *insertExecutor {
 		return e
 	}
 	for _, ptr := range ptrs {
-		// Convert to msgpack.
-		blob, err := msgpack.Marshal(ptr)
+		// Build map of values from pointer to struct.
+		m, err := structPtrToMap(ptr)
 		if err != nil {
-			e.err = errs.Wrap(ErrInsertValuesEncode, errs.WithCause(err),
+			e.err = errs.Wrap(ErrInsertValuePtr,
+				errs.WithCause(err),
 				errs.WithContext("ptr", ptr))
 			e.gari().errorLog(e.err.Error())
-			return e
-		}
-		// Unmarshal msgpack to map[string]encoded.
-		m, err := splitToMap(blob)
-		if err != nil {
-			e.err = errs.Wrap(ErrInsertValuesDecode, errs.WithCause(err),
-				errs.WithContext("ptr", ptr),
-				errs.WithContext("msgpack", blob))
 			return e
 		}
 		// Build record.
 		values := make([]*value, len(e.columns))
 		for i, col := range e.columns {
-			values[i] = newValue(col)
-			values[i].blob = m[col.fieldName]
+			values[i] = newValueByColumn(col)
+			values[i].raw = m[col.fieldName]
 		}
 		r := newRecord(values)
 		e.records = append(e.records, r)
@@ -99,8 +90,9 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 	}
 	// Check if records are not empty.
 	if len(e.records) == 0 {
-		e.err = errs.Wrap(ErrInsertRecordsEmpty,
-			errs.WithContext("query", e.query))
+		e.err = errs.Wrap(ErrInsertNoRecords,
+			errs.WithContext("query", e.query),
+			errs.WithContext("records", 0))
 		e.gari().errorLog(e.err.Error())
 		return e.err
 	}
