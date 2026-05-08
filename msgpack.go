@@ -169,6 +169,7 @@ func decodeNullInt64(blob []byte) (sql.NullInt64, error) {
 	return ni, nil
 }
 
+/*
 func splitToMap(blob []byte) (map[string]encoded, error) {
 	r := bytes.NewReader(blob)
 	dec := msgpack.NewDecoder(r)
@@ -198,6 +199,7 @@ func splitToMap(blob []byte) (map[string]encoded, error) {
 	}
 	return m, nil
 }
+*/
 
 // NULL in msgpack format.
 func msgpackNil() []byte {
