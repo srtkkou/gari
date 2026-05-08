@@ -16,7 +16,6 @@ type (
 	selectExecutor struct {
 		from    *Table // Main table to select from.
 		columns []*column
-		values  []*value
 		err     error // Error.
 
 		//		joins  []join  // JOIN statements.
@@ -49,19 +48,12 @@ func newSelectExecutor(t *Table) *selectExecutor {
 	e := selectExecutor{
 		from:    t,
 		columns: make([]*column, 0, len(t.columns)),
-		//values:  make([]*value, len(t.columns)),
-		orders: make([]order, 0),
-		offset: -1,
-		limit:  -1,
+		orders:  make([]order, 0),
+		offset:  -1,
+		limit:   -1,
 	}
 	// Copy columns from table.
 	e.columns = append(e.columns, t.columns...)
-	/*
-		// Initialize values from columns.
-		for i, col := range t.columns {
-			e.values[i] = newValueByColumn(col)
-		}
-	*/
 	return &e
 }
 
@@ -129,7 +121,7 @@ func (e *selectExecutor) Exec(
 			return err
 		}
 		// Pass Record to func.
-		r := newRecord(e.values)
+		r := newRecord(values)
 		fn(r)
 	}
 	// Check error
