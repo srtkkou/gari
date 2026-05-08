@@ -3,6 +3,7 @@ package gari
 import (
 	"database/sql"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,20 @@ func newRecord(values []*value) *Record {
 		r.m[value.fieldName] = value
 	}
 	return r
+}
+
+func (r *Record) String() string {
+	var sb strings.Builder
+	sb.WriteString(`{"type":"gari.Record"`)
+	sb.WriteString(`,"values":[`)
+	for i, value := range r.values {
+		if i > 0 {
+			sb.WriteString(`,`)
+		}
+		sb.WriteString(value.String())
+	}
+	sb.WriteString(`]}`)
+	return sb.String()
 }
 
 func (r *Record) ColumnNames() []string {
