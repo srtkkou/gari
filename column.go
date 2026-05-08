@@ -19,7 +19,7 @@ type (
 		size          int               // Size of column type.
 		primary       bool              // Primary key.
 		autoIncrement bool              // Flag to set AUTOINCREMENT.
-		notNull       bool              // Flag to set NOT NULL.
+		notNull       bool              // Flag to set NOT NULL. TODO Rename to nullable
 		defaultValue  encoded           // Default value of column.
 		rules         []validation.Rule // Validation rules.
 		ddlCache      string            //Cached DDL SQL statement.
@@ -34,7 +34,7 @@ var (
 
 // Create new column.
 func newColumn(t *Table, name string) *column {
-	return &column{
+	c := &column{
 		table:        t,
 		name:         name,
 		fieldName:    snakeToUpperCamelCase(name),
@@ -45,6 +45,7 @@ func newColumn(t *Table, name string) *column {
 		rules:        make([]validation.Rule, 0),
 		ddlCache:     "",
 	}
+	return c
 }
 
 // 文字列化
