@@ -19,7 +19,7 @@ func TestTableBuilder(t *testing.T) {
 	table, err := g.Table("users").
 		Int64Column("id", PrimaryKey(true), NotNull()).
 		StringColumn("xid",
-			NotNull(), Size(32), DefaultString("")).
+			NotNull(), Length(32), DefaultString("")).
 		TimeColumn("created_at",
 			DefaultNull()).
 		BoolColumn("ok",

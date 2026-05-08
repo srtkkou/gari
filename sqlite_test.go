@@ -42,7 +42,7 @@ func TestSqlite(t *testing.T) {
 		Int64Column("num",
 			NotNull(), DefaultInt64(0)).
 		StringColumn("text",
-			NotNull(), Size(255), DefaultString("DEFAULT")).
+			NotNull(), Length(255), DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
 	// Migrate.
