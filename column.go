@@ -1,57 +1,60 @@
 package gari
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/goark/errs"
 )
 
 type (
 	// 列
 	column struct {
-		table         *Table            // Pointer to table.
-		name          string            // Table column name.
-		fieldName     string            // Field name in struct.
-		kind          kind              // Column type.
-		size          int               // Size of column type.
-		primary       bool              // Primary key.
-		autoIncrement bool              // Flag to set AUTOINCREMENT.
-		notNull       bool              // Flag to set NOT NULL. TODO Rename to nullable
-		defaultValue  encoded           // Default value of column.
-		rules         []validation.Rule // Validation rules.
-		ddlCache      string            //Cached DDL SQL statement.
-		//err           error             // Error
-		//dbKind        sql.ColumnType    // Type on DB
+		table           *Table            // Pointer to table.
+		name            string            // Column name.
+		fieldName       string            // Golang struct Field name.
+		kind            kind              // Kind.
+		dbType          string            // DB type name.
+		length          int64             // Length of DB column.
+		precision       int64             // Decimal precision of DB column.
+		scale           int64             // Decimal precision of DB column.
+		isNullable      bool              // Allow nil for DB column.
+		defaultExists   bool              // Default value is set.
+		defaultValue    any               // Default raw value.
+		isPrimary       bool              // Primary key.
+		isAutoIncrement bool              // Set auto-increment for isPrimary key.
+		rules           []validation.Rule // Validation rules.
+		queryCache      string            //Cached DDL SQL statement.
 	}
-)
-
-var (
-	ErrColumnDDL = errors.New("gari.ErrColumnDDL")
 )
 
 // Create new column.
 func newColumn(t *Table, name string) *column {
 	c := &column{
-		table:        t,
-		name:         name,
-		fieldName:    snakeToUpperCamelCase(name),
-		kind:         "",
-		size:         255,
-		notNull:      false,
-		defaultValue: []byte{},
-		rules:        make([]validation.Rule, 0),
-		ddlCache:     "",
+		table:      t,
+		name:       name,
+		fieldName:  snakeToUpperCamelCase(name),
+		length:     255,
+		isNullable: true,
+		rules:      make([]validation.Rule, 0),
 	}
 	return c
 }
 
-// 文字列化
+// Convert to JSON string.
 func (c *column) String() string {
-	ddl, _ := c.ddl()
-	return ddl
+	var sb strings.Builder
+	sb.WriteString(`{"type":"gari.column"`)
+	sb.WriteString(`,"name":`)
+	sb.WriteString(strconv.Quote(c.name))
+	sb.WriteString(`,"fieldName":`)
+	sb.WriteString(strconv.Quote(c.fieldName))
+	sb.WriteString(`,"kind":`)
+	sb.WriteString(strconv.Quote(c.kind))
+	sb.WriteString(`,"query":`)
+	sb.WriteString(strconv.Quote(c.query()))
+	sb.WriteString(`}`)
+	return sb.String()
 }
 
 // Column name with table.
@@ -78,10 +81,10 @@ func (c *column) quotedFullName() string {
 }
 
 // Build DDL SQL.
-func (c *column) ddl() (string, error) {
-	// If present, return cached DDL SQL statement.
-	if len(c.ddlCache) > 0 {
-		return c.ddlCache, nil
+func (c *column) query() string {
+	// If present, return cached query.
+	if len(c.queryCache) > 0 {
+		return c.queryCache
 	}
 	tokens := make([]string, 0)
 	// Name.
@@ -96,55 +99,39 @@ func (c *column) ddl() (string, error) {
 		tokens = append(tokens, "INTEGER")
 	}
 	// Primary key and auto increment.
-	if c.primary {
-		tokens = append(tokens, "PRIMARY KEY")
-		if c.autoIncrement {
+	if c.isPrimary {
+		tokens = append(tokens, "PRIMARY", "KEY")
+		if c.isAutoIncrement {
 			tokens = append(tokens, "AUTOINCREMENT")
 		}
 	}
 	// Null
-	if c.notNull {
-		tokens = append(tokens, "NOT NULL")
+	if !c.isNullable {
+		tokens = append(tokens, "NOT", "NULL")
 	}
 	// Default
-	if len(c.defaultValue) > 0 {
-		switch c.kind {
-		case kindString:
-			ns, err := decodeNullString(c.defaultValue)
-			if err != nil {
-				err = errs.Wrap(ErrColumnDDL, errs.WithCause(err),
-					errs.WithContext("columnName", c.name),
-					errs.WithContext("default", c.defaultValue))
-				return "", err
-			}
-			if ns.Valid {
-				tokens = append(tokens, "DEFAULT")
-				quote := c.table.gari.stringQuote
-				tokens = append(tokens, quote+ns.String+quote)
-			} else {
-				tokens = append(tokens, "DEFAULT NULL")
-			}
-		case kindInt64:
-			ni, err := decodeNullInt64(c.defaultValue)
-			if err != nil {
-				err = errs.Wrap(ErrColumnDDL, errs.WithCause(err),
-					errs.WithContext("columnName", c.name),
-					errs.WithContext("default", c.defaultValue))
-				return "", err
-			}
-			if ni.Valid {
-				tokens = append(tokens, "DEFAULT")
-				tokens = append(tokens, strconv.FormatInt(ni.Int64, 10))
-			} else {
-				tokens = append(tokens, "DEFAULT NULL")
-			}
+	if c.defaultExists {
+		switch tv := c.defaultValue.(type) {
+		case nil:
+			tokens = append(tokens, "DEFAULT", "NULL")
+		case string:
+			token := c.gari().quoteString(tv)
+			tokens = append(tokens, "DEFAULT", token)
+		case int64:
+			token := strconv.FormatInt(tv, 10)
+			tokens = append(tokens, "DEFAULT", token)
 		}
 	}
-	c.ddlCache = strings.Join(tokens, " ")
-	return c.ddlCache, nil
+	c.queryCache = strings.Join(tokens, " ")
+	return c.queryCache
 }
 
 // Add validation rule to column.
 func (c *column) addRule(rule validation.Rule) {
 	c.rules = append(c.rules, rule)
+}
+
+// Shorthand func for *Gari.
+func (c *column) gari() *Gari {
+	return c.table.gari
 }
