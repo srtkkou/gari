@@ -18,6 +18,27 @@ var (
 	ErrNoPrimaryKey = errors.New("gari.ErrNoPrimaryKey")
 )
 
+// Add id.
+func (b *TableBuilder) IdColumn() *TableBuilder {
+	b.Int64Column("id", PrimaryKey(true))
+	return b
+}
+
+// Add timestamps.
+func (b *TableBuilder) TimeStampColumns() *TableBuilder {
+	b.TimeColumn("created_at", DefaultNull())
+	b.TimeColumn("updated_at", DefaultNull())
+	// TODO: Add table callback to update them.
+	return b
+}
+
+// Add soft delete column.
+func (b *TableBuilder) SoftDeleteColumn() *TableBuilder {
+	b.TimeColumn("deleted_at", DefaultNull())
+	// TODO: Allow Destroy() func.
+	return b
+}
+
 // Add string type column.
 func (b *TableBuilder) StringColumn(
 	name string, opts ...ColumnOption,

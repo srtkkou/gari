@@ -32,11 +32,9 @@ func TestSqlite(t *testing.T) {
 	defer g.Close()
 	// Define table.
 	table, err := g.Table("test_models").
-		Int64Column("id",
-			gari.PrimaryKey(true), gari.NotNull()).
-		TimeColumn("created_at", gari.NotNull()).
-		TimeColumn("updated_at", gari.NotNull()).
-		TimeColumn("deleted_at", gari.DefaultNull()).
+		IdColumn().
+		TimeStampColumns().
+		SoftDeleteColumn().
 		Int64Column("num",
 			gari.NotNull(), gari.DefaultInt64(0)).
 		StringColumn("text",

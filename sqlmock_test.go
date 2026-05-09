@@ -30,10 +30,9 @@ func TestSqlmock(t *testing.T) {
 	defer g.Close()
 	// Define table.
 	table, err := g.Table("test_models").
-		Int64Column("id", PrimaryKey(true), NotNull()).
-		TimeColumn("created_at", NotNull()).
-		TimeColumn("updated_at", NotNull()).
-		TimeColumn("deleted_at", DefaultNull()).
+		IdColumn().
+		TimeStampColumns().
+		SoftDeleteColumn().
 		Int64Column("num",
 			NotNull(), DefaultInt64(0)).
 		StringColumn("text",
