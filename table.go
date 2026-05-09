@@ -13,6 +13,13 @@ import (
 type (
 	// Table
 	Table struct {
+		BeforeInsert func(r *Record)
+		AfterInsert  func(r *Record)
+		BeforeUpdate func(r *Record)
+		AfterUpdate  func(r *Record)
+		BeforeDelete func(r *Record)
+		AfterDelete  func(r *Record)
+
 		gari           *Gari              // Pointer to gari config.
 		name           string             // Table name.
 		columns        []*column          // Slice of pointer to columns.

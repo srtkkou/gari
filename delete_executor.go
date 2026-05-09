@@ -85,7 +85,11 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 		return e.err
 	}
 	for _, r := range e.records {
-		// TODO:BEFORE DELETE
+		// Before delete callback.
+		if e.table.BeforeDelete != nil {
+			e.gari().debugLog("gari.Table.BeforeDelete")
+			e.table.BeforeDelete(r)
+		}
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
@@ -120,7 +124,11 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// TODO:AFTER DELETE
+		// After delete callback.
+		if e.table.AfterDelete != nil {
+			e.gari().debugLog("gari.Table.AfterDelete")
+			e.table.AfterDelete(r)
+		}
 	}
 	return nil
 }

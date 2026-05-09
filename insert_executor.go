@@ -97,7 +97,11 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 		return e.err
 	}
 	for _, r := range e.records {
-		// TODO:BEFORE INSERT
+		// Before insert callback.
+		if e.table.BeforeInsert != nil {
+			e.gari().debugLog("gari.Table.BeforeInsert")
+			e.table.BeforeInsert(r)
+		}
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
@@ -132,7 +136,11 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// TODO:AFTER INSERT
+		// After insert callback.
+		if e.table.AfterInsert != nil {
+			e.gari().debugLog("gari.Table.AfterInsert")
+			e.table.AfterInsert(r)
+		}
 	}
 	return nil
 }

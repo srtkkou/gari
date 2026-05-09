@@ -16,6 +16,13 @@ type (
 		Warn  func(msg string, args ...any) // Warn level log func.
 		Error func(msg string, args ...any) // Error level log func.
 
+		BeforeInsert func(r *Record)
+		AfterInsert  func(r *Record)
+		BeforeUpdate func(r *Record)
+		AfterUpdate  func(r *Record)
+		BeforeDelete func(r *Record)
+		AfterDelete  func(r *Record)
+
 		db          *sql.DB    // Pointer to database pool.
 		isClosed    bool       // Flag to see if db is closed.
 		stringQuote string     // Quotation of strings.

@@ -100,7 +100,11 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 		return e.err
 	}
 	for _, r := range e.records {
-		// TODO:BEFORE UPDATE
+		// Before update callback.
+		if e.table.BeforeUpdate != nil {
+			e.gari().debugLog("gari.Table.BeforeUpdate")
+			e.table.BeforeUpdate(r)
+		}
 		// Execute prepared statement.
 		args := r.args()
 		startedAt := time.Now()
@@ -135,7 +139,11 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// TODO:AFTER UPDATE
+		// After update callback.
+		if e.table.AfterUpdate != nil {
+			e.gari().debugLog("gari.Table.AfterUpdate")
+			e.table.AfterUpdate(r)
+		}
 	}
 	return nil
 }
