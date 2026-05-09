@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -15,8 +13,6 @@ import (
 )
 
 func TestSqlite(t *testing.T) {
-	// Initialize logger.
-	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	// Define struct.
 	type testModel struct {
 		Id        int
@@ -32,10 +28,6 @@ func TestSqlite(t *testing.T) {
 	defer db.Close()
 	// Initialize gari.
 	g, err := gari.Open(db)
-	g.Debug = logger.Debug
-	g.Info = logger.Info
-	g.Warn = logger.Warn
-	g.Error = logger.Error
 	require.NoError(t, err)
 	defer g.Close()
 	// Define table.

@@ -3,6 +3,8 @@ package gari
 import (
 	"database/sql"
 	"errors"
+	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/goark/errs"
@@ -11,10 +13,11 @@ import (
 type (
 	// Gari configuration.
 	Gari struct {
-		Debug func(msg string, args ...any) // Debug level log func.
-		Info  func(msg string, args ...any) // Info level log func.
-		Warn  func(msg string, args ...any) // Warn level log func.
-		Error func(msg string, args ...any) // Error level log func.
+		Logger *slog.Logger                  // Default logger.
+		Debug  func(msg string, args ...any) // Debug level log func.
+		Info   func(msg string, args ...any) // Info level log func.
+		Warn   func(msg string, args ...any) // Warn level log func.
+		Error  func(msg string, args ...any) // Error level log func.
 
 		BeforeInsert func(r *Record)
 		AfterInsert  func(r *Record)
@@ -47,6 +50,13 @@ func Open(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
 		idQuote:     `"`,
 		tables:      make([]*Table, 0),
 	}
+	// Setup logger.
+	logOpts := slog.HandlerOptions{Level: slog.LevelDebug}
+	g.Logger = slog.New(slog.NewJSONHandler(os.Stderr, &logOpts))
+	g.Debug = g.Logger.Debug
+	g.Info = g.Logger.Info
+	g.Warn = g.Logger.Warn
+	g.Error = g.Logger.Error
 	// Parse options.
 	for _, fn := range fns {
 		if err := fn(&g); err != nil {

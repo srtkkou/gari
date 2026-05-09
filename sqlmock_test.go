@@ -3,8 +3,6 @@ package gari
 import (
 	"context"
 	"database/sql"
-	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -13,8 +11,6 @@ import (
 )
 
 func TestSqlmock(t *testing.T) {
-	// Initialize logger.
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	// Define struct.
 	type testModel struct {
 		Id        int
@@ -30,10 +26,6 @@ func TestSqlmock(t *testing.T) {
 	defer db.Close()
 	// Initialize gari.
 	g, err := Open(db)
-	g.Debug = logger.Debug
-	g.Info = logger.Info
-	g.Warn = logger.Warn
-	g.Error = logger.Error
 	require.NoError(t, err)
 	defer g.Close()
 	// Define table.
