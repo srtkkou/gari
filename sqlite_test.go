@@ -97,12 +97,3 @@ func TestSqlite(t *testing.T) {
 	err = table.Delete().Values(&results[3]).Exec(ctx)
 	require.NoError(t, err)
 }
-
-/*
-// Define logger.
-func tLog(t *testing.T) func(string, ...any) {
-	return func(msg string, args ...any) {
-		t.Log(append([]any{msg}, args...))
-	}
-}
-*/
