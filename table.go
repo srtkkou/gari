@@ -78,11 +78,6 @@ func (t *Table) FieldNames() []string {
 	return names
 }
 
-// Build SELECT SQL statement.
-func (t *Table) Select() *selectExecutor {
-	return newSelectExecutor(t)
-}
-
 // Execute INSERT SQL statement.
 func (t *Table) Insert() *insertExecutor {
 	if t.insertExecutor != nil {
@@ -176,11 +171,6 @@ func (t *Table) LoadTestdata(xid string) error {
 	return t.SetFromDbMap(m, t.TableName())
 }
 */
-
-// Quoted table name.
-func (t *Table) quotedName() string {
-	return t.gari.quoteIdentifier(t.name)
-}
 
 // Add column to table
 func (t *Table) addColumn(col *column) {
