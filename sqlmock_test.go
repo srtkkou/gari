@@ -1,4 +1,4 @@
-package gari
+package gari_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/srtkkou/gari"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,8 +26,8 @@ func TestSqlmock(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Initialize gari.
-	dialect := SqliteDialect{}
-	g, err := Open(db, dialect)
+	dialect := gari.SqliteDialect{}
+	g, err := gari.Open(db, dialect)
 	require.NoError(t, err)
 	defer g.Close()
 	// Define table.
@@ -35,9 +36,9 @@ func TestSqlmock(t *testing.T) {
 		TimeStampColumns().
 		SoftDeleteColumn().
 		Int64Column("num",
-			NotNull(), DefaultInt64(0)).
+			gari.NotNull(), gari.DefaultInt64(0)).
 		StringColumn("text",
-			NotNull(), Length(255), DefaultString("DEFAULT")).
+			gari.NotNull(), gari.Length(255), gari.DefaultString("DEFAULT")).
 		Define()
 	require.NoError(t, err)
 	// Add DDL expectation.
@@ -76,7 +77,7 @@ func TestSqlmock(t *testing.T) {
 	models := make([]testModel, 0)
 	err = g.Select(`
 		SELECT * FROM "test_models" ORDER BY "num" ASC;
-	`).Exec(ctx, func(r *Record) {
+	`).Exec(ctx, func(r *gari.Record) {
 		m := testModel{}
 		r.SetInt("id", &m.Id)
 		r.SetTime("created_at", &m.CreatedAt)

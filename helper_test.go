@@ -1,4 +1,4 @@
-package gari
+package gari_test
 
 import (
 	"database/sql"
