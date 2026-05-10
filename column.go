@@ -57,72 +57,51 @@ func (c *column) String() string {
 	return sb.String()
 }
 
-// Column name with table.
-func (c *column) fullName() string {
-	var sb strings.Builder
-	sb.WriteString(c.table.name)
-	sb.WriteString(".")
-	sb.WriteString(c.name)
-	return sb.String()
-}
-
-// Quoted column name.
-func (c *column) quotedName() string {
-	return c.table.gari.quoteIdentifier(c.name)
-}
-
-// Quoted full column name.
-func (c *column) quotedFullName() string {
-	var sb strings.Builder
-	sb.WriteString(c.table.quotedName())
-	sb.WriteString(".")
-	sb.WriteString(c.quotedName())
-	return sb.String()
-}
-
 // Build DDL SQL.
 func (c *column) query() string {
 	// If present, return cached query.
 	if len(c.queryCache) > 0 {
 		return c.queryCache
 	}
-	tokens := make([]string, 0)
+	dialect := c.gari().dialect
+	var sb strings.Builder
 	// Name.
-	tokens = append(tokens, c.name)
+	sb.WriteString(c.name)
+	sb.WriteString(` `)
 	// Type
 	switch c.kind {
 	case kindString:
-		tokens = append(tokens, "TEXT")
+		sb.WriteString(`TEXT`)
 	case kindTime:
-		tokens = append(tokens, "DATETIME")
+		sb.WriteString(`DATETIME`)
 	case kindInt64:
-		tokens = append(tokens, "INTEGER")
+		sb.WriteString(`INTEGER`)
 	}
 	// Primary key and auto increment.
 	if c.isPrimary {
-		tokens = append(tokens, "PRIMARY", "KEY")
+		sb.WriteString(` PRIMARY KEY`)
 		if c.isAutoIncrement {
-			tokens = append(tokens, "AUTOINCREMENT")
+			sb.WriteString(` AUTOINCREMENT`)
 		}
 	}
 	// Null
 	if !c.isNullable {
-		tokens = append(tokens, "NOT", "NULL")
+		sb.WriteString(` NOT NULL`)
 	}
 	// Default
 	if c.defaultExists {
 		switch tv := c.defaultValue.(type) {
 		case nil:
-			tokens = append(tokens, "DEFAULT", "NULL")
+			sb.WriteString(` DEFAULT NULL`)
 		case string:
-			token := c.gari().quoteString(tv)
-			tokens = append(tokens, "DEFAULT", token)
+			sb.WriteString(` DEFAULT `)
+			dialect.QuoteString(&sb, tv)
 		case int64:
-			token := strconv.FormatInt(tv, 10)
-			tokens = append(tokens, "DEFAULT", token)
+			sb.WriteString(` DEFAULT `)
+			sb.WriteString(strconv.FormatInt(tv, 10))
 		}
 	}
-	c.queryCache = strings.Join(tokens, " ")
+	c.queryCache = sb.String()
 	return c.queryCache
 }
 

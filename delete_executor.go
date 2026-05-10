@@ -145,17 +145,17 @@ func (e *deleteExecutor) query() string {
 		return e.queryCache
 	}
 	dialect := e.gari().dialect
-	tokens := []string{"DELETE", "FROM"}
+	var sb strings.Builder
+	sb.WriteString("DELETE FROM ")
 	// Add table name.
-	tokens = append(tokens, e.table.quotedName())
+	dialect.QuoteTable(&sb, e.table.name)
 	// Add WHERE statement.
-	tokens = append(tokens, "WHERE")
-	pkey := e.table.pkey.quotedName()
-	tokens = append(tokens, pkey, "=")
-	// Add id placeholder.
-	bv := dialect.BindVar(0)
-	tokens = append(tokens, bv)
-	e.queryCache = strings.Join(tokens, " ") + dialect.QuerySuffix()
+	sb.WriteString(" WHERE ")
+	dialect.QuoteColumn(&sb, e.table.pkey.name)
+	sb.WriteString(" = ")
+	dialect.BindVar(&sb, 0)
+	dialect.QuerySuffix(&sb)
+	e.queryCache = sb.String()
 	return e.queryCache
 }
 

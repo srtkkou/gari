@@ -21,20 +21,20 @@ func newDdlBuilder(t *Table) *ddlBuilder {
 
 // Build DDL SQL.
 func (b *ddlBuilder) build() (string, error) {
-	tokens := make([]string, 0)
-	tokens = append(tokens, "CREATE", "TABLE")
-	tokens = append(tokens, "IF", "NOT", "EXISTS")
-	tokens = append(tokens, b.table.name, "(")
+	dialect := b.table.gari.dialect
+	var sb strings.Builder
+	sb.WriteString(`CREATE TABLE `)
+	sb.WriteString(`IF NOT EXISTS `)
+	sb.WriteString(b.table.name)
+	sb.WriteString(` (`)
 	for i, col := range b.table.columns {
-		// Add column DDL token.
-		token := col.query()
-		// Add comma.
-		if i < (len(b.table.columns) - 1) {
-			token += ","
+		if i > 0 {
+			sb.WriteString(`, `)
 		}
-		tokens = append(tokens, token)
+		// Add column DDL token.
+		sb.WriteString(col.query())
 	}
-	tokens = append(tokens, ");")
-	query := strings.Join(tokens, " ")
-	return query, nil
+	sb.WriteString(`)`)
+	dialect.QuerySuffix(&sb)
+	return sb.String(), nil
 }

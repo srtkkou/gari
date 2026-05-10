@@ -160,26 +160,29 @@ func (e *updateExecutor) query() string {
 		return e.queryCache
 	}
 	dialect := e.gari().dialect
-	tokens := []string{"UPDATE"}
+	var sb strings.Builder
+	sb.WriteString("UPDATE ")
 	// Add table name.
-	tokens = append(tokens, e.table.quotedName(), "SET")
+	dialect.QuoteTable(&sb, e.table.name)
+	sb.WriteString(" SET ")
 	// Add column names and placeholders.
 	count := 0
 	for _, col := range e.columns {
-		bv := dialect.BindVar(count)
-		if count < (len(e.columns) - 1) {
-			bv += ","
+		if count > 0 {
+			sb.WriteString(`, `)
 		}
-		tokens = append(tokens, col.quotedName(), "=", bv)
+		dialect.QuoteColumn(&sb, col.name)
+		sb.WriteString(` = `)
+		dialect.BindVar(&sb, count)
 		count++
 	}
 	// Add WHERE statement.
-	tokens = append(tokens, "WHERE")
-	pkey := e.table.pkey.quotedName()
-	tokens = append(tokens, pkey, "=")
-	bv := dialect.BindVar(count)
-	tokens = append(tokens, bv)
-	e.queryCache = strings.Join(tokens, " ") + dialect.QuerySuffix()
+	sb.WriteString(` WHERE `)
+	dialect.QuoteColumn(&sb, e.table.pkey.name)
+	sb.WriteString(` = `)
+	dialect.BindVar(&sb, count)
+	dialect.QuerySuffix(&sb)
+	e.queryCache = sb.String()
 	return e.queryCache
 }
 

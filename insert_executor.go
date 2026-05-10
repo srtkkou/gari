@@ -158,28 +158,29 @@ func (e *insertExecutor) query() string {
 		return e.queryCache
 	}
 	dialect := e.gari().dialect
-	tokens := []string{"INSERT", "INTO"}
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO `)
 	// Add table name.
-	tokens = append(tokens, e.table.quotedName(), "(")
+	dialect.QuoteTable(&sb, e.table.name)
+	sb.WriteString(` (`)
 	// Add column names.
 	for i, col := range e.columns {
-		name := col.quotedName()
-		if i < (len(e.columns) - 1) {
-			name += ","
+		if i > 0 {
+			sb.WriteString(`, `)
 		}
-		tokens = append(tokens, name)
+		dialect.QuoteColumn(&sb, col.name)
 	}
 	// Add value placeholders.
-	tokens = append(tokens, ")", "VALUES", "(")
+	sb.WriteString(`) VALUES (`)
 	for i := range e.columns {
-		bv := dialect.BindVar(i)
-		if i < (len(e.columns) - 1) {
-			bv += ","
+		if i > 0 {
+			sb.WriteString(`, `)
 		}
-		tokens = append(tokens, bv)
+		dialect.BindVar(&sb, i)
 	}
-	tokens = append(tokens, ")")
-	e.queryCache = strings.Join(tokens, " ") + dialect.QuerySuffix()
+	sb.WriteString(`)`)
+	dialect.QuerySuffix(&sb)
+	e.queryCache = sb.String()
 	return e.queryCache
 }
 
