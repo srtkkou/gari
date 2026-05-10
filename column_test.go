@@ -26,7 +26,8 @@ func TestColumnDefaultString(t *testing.T) {
 		db, _, err := sqlmock.New()
 		require.NoError(t, err)
 		// Use gari.
-		g, err := Open(db)
+		dialect := SqliteDialect{}
+		g, err := Open(db, dialect)
 		require.NoError(t, err)
 		defer g.Close()
 		t.Run(test.name, func(t *testing.T) {

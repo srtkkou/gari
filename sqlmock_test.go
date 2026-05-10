@@ -25,7 +25,8 @@ func TestSqlmock(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Initialize gari.
-	g, err := Open(db)
+	dialect := SqliteDialect{}
+	g, err := Open(db, dialect)
 	require.NoError(t, err)
 	defer g.Close()
 	// Define table.

@@ -27,7 +27,8 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 	// Initialize gari.
-	g, err := gari.Open(db)
+	dialect := gari.SqliteDialect{}
+	g, err := gari.Open(db, dialect)
 	require.NoError(t, err)
 	defer g.Close()
 	// Define table.
