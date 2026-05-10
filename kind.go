@@ -9,4 +9,5 @@ const (
 	kindTime    = kind("Time")
 	kindInt64   = kind("Int64")
 	kindFloat64 = kind("Float64")
+	kindBlob    = kind("Blob")
 )
