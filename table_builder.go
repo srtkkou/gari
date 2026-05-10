@@ -43,21 +43,55 @@ func (b *TableBuilder) SoftDeleteColumn() *TableBuilder {
 func (b *TableBuilder) StringColumn(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindString, opts)
+	fn := func(col *column) {
+		col.kind = kindString
+		col.dbType = "TEXT" // TODO: Change to dialect.
+	}
+	return b.addColumn(name, fn, opts)
 }
 
 // Add time type column.
 func (b *TableBuilder) TimeColumn(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindTime, opts)
+	fn := func(col *column) {
+		col.kind = kindTime
+		col.dbType = "DATETIME" // TODO: Change to dialect.
+	}
+	return b.addColumn(name, fn, opts)
 }
 
 // Add int64 type column.
 func (b *TableBuilder) Int64Column(
 	name string, opts ...ColumnOption,
 ) *TableBuilder {
-	return b.addColumnWithKind(name, kindInt64, opts)
+	fn := func(col *column) {
+		col.kind = kindInt64
+		col.dbType = "INTEGER" // TODO: Change to dialect.
+	}
+	return b.addColumn(name, fn, opts)
+}
+
+// Add float64 type column.
+func (b *TableBuilder) Float64Column(
+	name string, opts ...ColumnOption,
+) *TableBuilder {
+	fn := func(col *column) {
+		col.kind = kindFloat64
+		col.dbType = "REAL" // TODO: Change to dialect.
+	}
+	return b.addColumn(name, fn, opts)
+}
+
+// Add blob byte column.
+func (b *TableBuilder) BlobColumn(
+	name string, opts ...ColumnOption,
+) *TableBuilder {
+	fn := func(col *column) {
+		col.kind = kindBlob
+		col.dbType = "BLOB" // TODO: Change to dialect.
+	}
+	return b.addColumn(name, fn, opts)
 }
 
 // Define table.
@@ -84,8 +118,8 @@ func (b *TableBuilder) MustDefine() *Table {
 }
 
 // Add column with specified type.
-func (b *TableBuilder) addColumnWithKind(
-	name string, k kind, opts []ColumnOption,
+func (b *TableBuilder) addColumn(
+	name string, fn func(c *column), opts []ColumnOption,
 ) *TableBuilder {
 	// Skip if tableBuilder has error.
 	if b.err != nil {
@@ -94,7 +128,7 @@ func (b *TableBuilder) addColumnWithKind(
 	// Create new column and set to columnBuilder.
 	col := newColumn(b.table, name)
 	cb := newColumnBuilder(col)
-	col.kind = k
+	fn(col)
 	// Parse column options.
 	for _, opt := range opts {
 		opt(cb)
