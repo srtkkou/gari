@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/goark/errs"
 )
@@ -109,24 +108,6 @@ func (g *Gari) Select(query string) *rawSelectExecutor {
 func (g *Gari) BeginTx() *txBuilder {
 	g.txBuilder = newTxBuilder(g)
 	return g.txBuilder
-}
-
-// Quote identifier.
-func (g *Gari) quoteIdentifier(identifier string) string {
-	var sb strings.Builder
-	sb.WriteString(g.idQuote)
-	sb.WriteString(identifier)
-	sb.WriteString(g.idQuote)
-	return sb.String()
-}
-
-// Quote string.
-func (g *Gari) quoteString(str string) string {
-	var sb strings.Builder
-	sb.WriteString(g.stringQuote)
-	sb.WriteString(str)
-	sb.WriteString(g.stringQuote)
-	return sb.String()
 }
 
 // Output debug log.
