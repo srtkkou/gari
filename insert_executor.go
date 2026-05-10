@@ -14,12 +14,12 @@ import (
 type (
 	// Executor to run INSERT SQL.
 	insertExecutor struct {
-		table    *Table    // Pointer to table.
-		columns  []*column // Slice of columns except primary key.
-		query    string    // INSERT SQL query.
-		prepared *sql.Stmt // Prepared statement pointer.
-		records  []*Record // Records to insert.
-		err      error     // Error.
+		table      *Table    // Pointer to table.
+		columns    []*column // Slice of columns except primary key.
+		queryCache string    // INSERT SQL query cache.
+		prepared   *sql.Stmt // Prepared statement pointer.
+		records    []*Record // Records to insert.
+		err        error     // Error.
 	}
 )
 
@@ -47,8 +47,6 @@ func newInsertExecutor(t *Table) *insertExecutor {
 		}
 		e.columns = append(e.columns, col)
 	}
-	// Build INSERT SQL query.
-	e.query = e.buildQuery()
 	return &e
 }
 
@@ -103,19 +101,20 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 			e.table.BeforeInsert(r)
 		}
 		// Execute prepared statement.
+		query := e.query()
 		args := r.args()
 		startedAt := time.Now()
 		result, err := e.prepared.ExecContext(ctx, args...)
 		if err != nil {
 			e.err = errs.Wrap(ErrInsertExec, errs.WithCause(err),
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
 		e.gari().infoLog("Execute INSERT SQL.",
-			slog.String("query", e.query),
+			slog.String("query", query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
@@ -123,14 +122,14 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 		if err != nil {
 			e.err = errs.Wrap(ErrInsertRowsAffected,
 				errs.WithCause(err),
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args))
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
 		if count != 1 {
 			e.err = errs.Wrap(ErrInsertRowCount,
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
 			e.gari().errorLog(e.err.Error())
@@ -154,7 +153,10 @@ func (e *insertExecutor) closePreparedStmt() {
 }
 
 // Build INSERT SQL statement.
-func (e *insertExecutor) buildQuery() string {
+func (e *insertExecutor) query() string {
+	if len(e.queryCache) > 0 {
+		return e.queryCache
+	}
 	dialect := e.gari().dialect
 	tokens := []string{"INSERT", "INTO"}
 	// Add table name.
@@ -177,25 +179,24 @@ func (e *insertExecutor) buildQuery() string {
 		tokens = append(tokens, bv)
 	}
 	tokens = append(tokens, ")")
-	query := strings.Join(tokens, " ") + dialect.QuerySuffix()
-	e.gari().debugLog("insertExecutor.buildQuery()",
-		slog.String("query", query))
-	return query
+	e.queryCache = strings.Join(tokens, " ") + dialect.QuerySuffix()
+	return e.queryCache
 }
 
 // Prepare INSERT SQL statement.
 func (e *insertExecutor) prepareStmt() {
 	var err error
+	query := e.query()
 	startedAt := time.Now()
-	e.prepared, err = e.gari().db.Prepare(e.query)
+	e.prepared, err = e.gari().db.Prepare(query)
 	if err != nil {
 		e.err = errs.Wrap(ErrInsertPrepare, errs.WithCause(err),
-			errs.WithContext("query", e.query),
+			errs.WithContext("query", query),
 			errs.WithContext("duration", time.Since(startedAt)))
 		e.gari().errorLog(e.err.Error())
 	}
 	e.gari().infoLog("insertExecutor.prepareStmt()",
-		slog.String("query", e.query),
+		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 }
 

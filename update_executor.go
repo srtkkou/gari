@@ -14,12 +14,12 @@ import (
 type (
 	// Executor to run UPDATE SQL.
 	updateExecutor struct {
-		table    *Table    // Pointer to table.
-		columns  []*column // Slice of column pointers.
-		query    string    // UPDATE SQL query.
-		prepared *sql.Stmt // Prepared statement pointer.
-		records  []*Record // Records to update.
-		err      error     // Error.
+		table      *Table    // Pointer to table.
+		columns    []*column // Slice of column pointers.
+		queryCache string    // UPDATE SQL query cache.
+		prepared   *sql.Stmt // Prepared statement pointer.
+		records    []*Record // Records to update.
+		err        error     // Error.
 	}
 )
 
@@ -46,8 +46,6 @@ func newUpdateExecutor(t *Table) *updateExecutor {
 		}
 		e.columns = append(e.columns, col)
 	}
-	// Build UPDATE SQL query.
-	e.query = e.buildQuery()
 	return &e
 }
 
@@ -106,19 +104,20 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 			e.table.BeforeUpdate(r)
 		}
 		// Execute prepared statement.
+		query := e.query()
 		args := r.args()
 		startedAt := time.Now()
 		result, err := e.prepared.ExecContext(ctx, args...)
 		if err != nil {
 			e.err = errs.Wrap(ErrUpdateExec, errs.WithCause(err),
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
 		e.gari().infoLog("Execute UPDATE SQL.",
-			slog.String("query", e.query),
+			slog.String("query", query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
@@ -126,14 +125,14 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 		if err != nil {
 			e.err = errs.Wrap(ErrUpdateRowsAffected,
 				errs.WithCause(err),
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args))
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
 		if count != 1 {
 			e.err = errs.Wrap(ErrUpdateRowCount,
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
 			e.gari().errorLog(e.err.Error())
@@ -156,7 +155,10 @@ func (e *updateExecutor) closePreparedStmt() {
 }
 
 // Build SQL statement.
-func (e *updateExecutor) buildQuery() string {
+func (e *updateExecutor) query() string {
+	if len(e.queryCache) > 0 {
+		return e.queryCache
+	}
 	dialect := e.gari().dialect
 	tokens := []string{"UPDATE"}
 	// Add table name.
@@ -177,23 +179,24 @@ func (e *updateExecutor) buildQuery() string {
 	tokens = append(tokens, pkey, "=")
 	bv := dialect.BindVar(count)
 	tokens = append(tokens, bv)
-	query := strings.Join(tokens, " ") + dialect.QuerySuffix()
-	return query
+	e.queryCache = strings.Join(tokens, " ") + dialect.QuerySuffix()
+	return e.queryCache
 }
 
 // Prepare UPDATE SQL statement.
 func (e *updateExecutor) prepareStmt() {
 	startedAt := time.Now()
 	var err error
-	e.prepared, err = e.gari().db.Prepare(e.query)
+	query := e.query()
+	e.prepared, err = e.gari().db.Prepare(query)
 	if err != nil {
 		e.err = errs.Wrap(ErrUpdatePrepare, errs.WithCause(err),
-			errs.WithContext("query", e.query),
+			errs.WithContext("query", query),
 			errs.WithContext("duration", time.Since(startedAt)))
 		e.gari().errorLog(e.err.Error())
 	}
 	e.gari().infoLog("Prepare UPDATE SQL.",
-		slog.String("query", e.query),
+		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 }
 

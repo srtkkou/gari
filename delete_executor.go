@@ -14,11 +14,11 @@ import (
 type (
 	// Executor to run DELETE SQL.
 	deleteExecutor struct {
-		table    *Table    // Pointer to table.
-		query    string    // UPDATE SQL query.
-		prepared *sql.Stmt // Prepared statement pointer.
-		records  []*Record // Records to update.
-		err      error     // Error.
+		table      *Table    // Pointer to table.
+		queryCache string    // DELETE SQL query cache.
+		prepared   *sql.Stmt // Prepared statement pointer.
+		records    []*Record // Records to update.
+		err        error     // Error.
 	}
 )
 
@@ -37,8 +37,6 @@ func newDeleteExecutor(t *Table) *deleteExecutor {
 		table:   t,
 		records: make([]*Record, 0),
 	}
-	// Build DELETE SQL query.
-	e.query = e.buildQuery()
 	return &e
 }
 
@@ -91,19 +89,20 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 			e.table.BeforeDelete(r)
 		}
 		// Execute prepared statement.
+		query := e.query()
 		args := r.args()
 		startedAt := time.Now()
 		result, err := e.prepared.ExecContext(ctx, args...)
 		if err != nil {
 			e.err = errs.Wrap(ErrDeleteExec, errs.WithCause(err),
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args),
 				errs.WithContext("duration", time.Since(startedAt)))
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		e.gari().infoLog("Execute UPDATE SQL.",
-			slog.String("query", e.query),
+		e.gari().infoLog("Execute DELETE SQL.",
+			slog.String("query", query),
 			slog.Any("args", args),
 			slog.Duration("duration", time.Since(startedAt)))
 		// Check row count.
@@ -111,14 +110,14 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 		if err != nil {
 			e.err = errs.Wrap(ErrDeleteRowsAffected,
 				errs.WithCause(err),
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args))
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
 		if count != 1 {
 			e.err = errs.Wrap(ErrDeleteRowCount,
-				errs.WithContext("query", e.query),
+				errs.WithContext("query", query),
 				errs.WithContext("args", args),
 				errs.WithContext("rowsAffected", count))
 			e.gari().errorLog(e.err.Error())
@@ -141,7 +140,10 @@ func (e *deleteExecutor) closePreparedStmt() {
 }
 
 // Build SQL statement.
-func (e *deleteExecutor) buildQuery() string {
+func (e *deleteExecutor) query() string {
+	if len(e.queryCache) > 0 {
+		return e.queryCache
+	}
 	dialect := e.gari().dialect
 	tokens := []string{"DELETE", "FROM"}
 	// Add table name.
@@ -153,23 +155,24 @@ func (e *deleteExecutor) buildQuery() string {
 	// Add id placeholder.
 	bv := dialect.BindVar(0)
 	tokens = append(tokens, bv)
-	query := strings.Join(tokens, " ") + dialect.QuerySuffix()
-	return query
+	e.queryCache = strings.Join(tokens, " ") + dialect.QuerySuffix()
+	return e.queryCache
 }
 
 // Prepare DELETE SQL statement.
 func (e *deleteExecutor) prepareStmt() {
 	startedAt := time.Now()
 	var err error
-	e.prepared, err = e.gari().db.Prepare(e.query)
+	query := e.query()
+	e.prepared, err = e.gari().db.Prepare(query)
 	if err != nil {
 		e.err = errs.Wrap(ErrDeletePrepare, errs.WithCause(err),
-			errs.WithContext("query", e.query),
+			errs.WithContext("query", query),
 			errs.WithContext("duration", time.Since(startedAt)))
 		e.gari().errorLog(e.err.Error())
 	}
 	e.gari().infoLog("deleteExecutor.prepareStmt()",
-		slog.String("query", e.query),
+		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 }
 
