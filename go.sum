@@ -164,10 +164,10 @@ github.com/go-task/task/v3 v3.50.0 h1:VO2moBcbUaVlCLmpQI9c7GT3vJ8JrIpylS+TJq53FM
 github.com/go-task/task/v3 v3.50.0/go.mod h1:PIiVErGy3MhZeajTU4TQ6K6mQ520fK1hNXZT7yAmFkc=
 github.com/go-task/template v0.2.0 h1:xW7ek0o65FUSTbKcSNeg2Vyf/I7wYXFgLUznptvviBE=
 github.com/go-task/template v0.2.0/go.mod h1:dbdoUb6qKnHQi1y6o+IdIrs0J4o/SEhSTA6bbzZmdtc=
-github.com/goark/errs v1.3.2 h1:ifccNe1aK7Xezt4XVYwHUqalmnfhuphnEvh3FshCReQ=
-github.com/goark/errs v1.3.2/go.mod h1:ZsQucxaDFVfSB8I99j4bxkDRfNOrlKINwg72QMuRWKw=
 github.com/goark/errs v1.3.3 h1:vqzm/1aqvh4Ha8JDqIqIU5ZoBtjaRezFcMC55B5ljAM=
 github.com/goark/errs v1.3.3/go.mod h1:4xM7rorwYQlqh9kUhfKpC5P7VAJW2KfvuQpYnTaU0ek=
+github.com/goark/errs v1.3.4 h1:/+/xwF3UwXGxGGLurzBTaMMoryTBeaPfheJ1aW9cglA=
+github.com/goark/errs v1.3.4/go.mod h1:4xM7rorwYQlqh9kUhfKpC5P7VAJW2KfvuQpYnTaU0ek=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=

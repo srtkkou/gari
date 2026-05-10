@@ -11,7 +11,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
-	github.com/goark/errs v1.3.3
+	github.com/goark/errs v1.3.4
 	github.com/stretchr/testify v1.11.1
 )
 
