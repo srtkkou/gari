@@ -28,6 +28,7 @@ type (
 
 		db          *sql.DB    // Pointer to database pool.
 		isClosed    bool       // Flag to see if db is closed.
+		dialect     Dialect    // Dialects of DB.
 		stringQuote string     // Quotation of strings.
 		idQuote     string     // Quotation of identifiers.
 		tables      []*Table   // Pointer to tables.
@@ -42,10 +43,11 @@ var (
 )
 
 // Open DB connection.
-func Open(db *sql.DB, fns ...OptionFunc) (*Gari, error) {
+func Open(db *sql.DB, dialect Dialect, fns ...OptionFunc) (*Gari, error) {
 	g := Gari{
-		isClosed:    false,
 		db:          db,
+		isClosed:    false,
+		dialect:     dialect,
 		stringQuote: `'`,
 		idQuote:     `"`,
 		tables:      make([]*Table, 0),
@@ -130,7 +132,7 @@ func (g *Gari) quoteString(str string) string {
 // Get placeholder.
 // TODO: It should return $1,$2... for postgres.
 func (g *Gari) placeholder(i int) string {
-	return "?"
+	return g.dialect.BindVar(i)
 }
 
 // Output debug log.
