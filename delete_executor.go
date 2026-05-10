@@ -142,6 +142,7 @@ func (e *deleteExecutor) closePreparedStmt() {
 
 // Build SQL statement.
 func (e *deleteExecutor) buildQuery() string {
+	dialect := e.gari().dialect
 	tokens := []string{"DELETE", "FROM"}
 	// Add table name.
 	tokens = append(tokens, e.table.quotedName())
@@ -149,9 +150,11 @@ func (e *deleteExecutor) buildQuery() string {
 	tokens = append(tokens, "WHERE")
 	pkey := e.table.pkey.quotedName()
 	tokens = append(tokens, pkey, "=")
-	ph := e.table.gari.placeholder(0) + ";"
-	tokens = append(tokens, ph)
-	return strings.Join(tokens, " ")
+	// Add id placeholder.
+	bv := dialect.BindVar(0)
+	tokens = append(tokens, bv)
+	query := strings.Join(tokens, " ") + dialect.QuerySuffix()
+	return query
 }
 
 // Prepare DELETE SQL statement.

@@ -155,6 +155,7 @@ func (e *insertExecutor) closePreparedStmt() {
 
 // Build INSERT SQL statement.
 func (e *insertExecutor) buildQuery() string {
+	dialect := e.gari().dialect
 	tokens := []string{"INSERT", "INTO"}
 	// Add table name.
 	tokens = append(tokens, e.table.quotedName(), "(")
@@ -169,14 +170,14 @@ func (e *insertExecutor) buildQuery() string {
 	// Add value placeholders.
 	tokens = append(tokens, ")", "VALUES", "(")
 	for i := range e.columns {
-		ph := e.table.gari.placeholder(i)
+		bv := dialect.BindVar(i)
 		if i < (len(e.columns) - 1) {
-			ph += ","
+			bv += ","
 		}
-		tokens = append(tokens, ph)
+		tokens = append(tokens, bv)
 	}
-	tokens = append(tokens, ");")
-	query := strings.Join(tokens, " ")
+	tokens = append(tokens, ")")
+	query := strings.Join(tokens, " ") + dialect.QuerySuffix()
 	e.gari().debugLog("insertExecutor.buildQuery()",
 		slog.String("query", query))
 	return query

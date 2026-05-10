@@ -157,26 +157,28 @@ func (e *updateExecutor) closePreparedStmt() {
 
 // Build SQL statement.
 func (e *updateExecutor) buildQuery() string {
+	dialect := e.gari().dialect
 	tokens := []string{"UPDATE"}
 	// Add table name.
 	tokens = append(tokens, e.table.quotedName(), "SET")
 	// Add column names and placeholders.
 	count := 0
 	for _, col := range e.columns {
-		ph := e.table.gari.placeholder(count)
+		bv := dialect.BindVar(count)
 		if count < (len(e.columns) - 1) {
-			ph += ","
+			bv += ","
 		}
-		tokens = append(tokens, col.quotedName(), "=", ph)
+		tokens = append(tokens, col.quotedName(), "=", bv)
 		count++
 	}
 	// Add WHERE statement.
 	tokens = append(tokens, "WHERE")
 	pkey := e.table.pkey.quotedName()
 	tokens = append(tokens, pkey, "=")
-	ph := e.table.gari.placeholder(count) + ";"
-	tokens = append(tokens, ph)
-	return strings.Join(tokens, " ")
+	bv := dialect.BindVar(count)
+	tokens = append(tokens, bv)
+	query := strings.Join(tokens, " ") + dialect.QuerySuffix()
+	return query
 }
 
 // Prepare UPDATE SQL statement.

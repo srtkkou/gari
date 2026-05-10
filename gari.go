@@ -129,12 +129,6 @@ func (g *Gari) quoteString(str string) string {
 	return sb.String()
 }
 
-// Get placeholder.
-// TODO: It should return $1,$2... for postgres.
-func (g *Gari) placeholder(i int) string {
-	return g.dialect.BindVar(i)
-}
-
 // Output debug log.
 //
 //lint:ignore U1000 Defined for future use.
