@@ -100,8 +100,8 @@ func (g *Gari) Table(name string) *TableBuilder {
 }
 
 // Execute SELECT SQL statement.
-func (g *Gari) Select(query string) *rawSelectExecutor {
-	return newRawSelectExecutor(g, query)
+func (g *Gari) Select(query string) *selectExecutor {
+	return newSelectExecutor(g, query)
 }
 
 // Begin transaction.

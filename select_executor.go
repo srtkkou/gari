@@ -12,7 +12,7 @@ import (
 
 type (
 	// Executor to run raw SELECT SQL.
-	rawSelectExecutor struct {
+	selectExecutor struct {
 		gari  *Gari
 		query string
 		err   error // Error.
@@ -20,17 +20,17 @@ type (
 )
 
 var (
-	ErrRawSelectExec        = errors.New("gari.ErrRawSelectExec")
-	ErrRawSelectScan        = errors.New("gari.ErrRawSelectScan")
-	ErrRawSelectRows        = errors.New("gari.ErrRawSelectRows")
-	ErrRawSelectColumnTypes = errors.New("gari.ErrRawSelectColumnTypes")
+	ErrSelectExec        = errors.New("gari.ErrSelectExec")
+	ErrSelectScan        = errors.New("gari.ErrSelectScan")
+	ErrSelectRows        = errors.New("gari.ErrSelectRows")
+	ErrSelectColumnTypes = errors.New("gari.ErrSelectColumnTypes")
 )
 
 // Create new selectExecutor.
-func newRawSelectExecutor(g *Gari, query string) *rawSelectExecutor {
+func newSelectExecutor(g *Gari, query string) *selectExecutor {
 	query = strings.ReplaceAll(query, "\t", "")
 	query = strings.ReplaceAll(query, "\n", "")
-	e := rawSelectExecutor{
+	e := selectExecutor{
 		gari:  g,
 		query: query,
 	}
@@ -38,7 +38,7 @@ func newRawSelectExecutor(g *Gari, query string) *rawSelectExecutor {
 }
 
 // Execute SELECT SQL query.
-func (e *rawSelectExecutor) Exec(
+func (e *selectExecutor) Exec(
 	ctx context.Context, fn func(r *Record),
 ) error {
 	if e.err != nil {
@@ -48,20 +48,20 @@ func (e *rawSelectExecutor) Exec(
 	startedAt := time.Now()
 	rows, err := e.gari.db.QueryContext(ctx, e.query)
 	if err != nil {
-		e.err = errs.Wrap(ErrRawSelectExec, errs.WithCause(err),
+		e.err = errs.Wrap(ErrSelectExec, errs.WithCause(err),
 			errs.WithContext("query", e.query),
 			errs.WithContext("duration", time.Since(startedAt)))
 		e.gari.errorLog(e.err.Error())
 		return e.err
 	}
-	e.gari.infoLog("rawSelectExecutor.Exec",
+	e.gari.infoLog("selectExecutor.Exec",
 		slog.String("query", e.query),
 		slog.Duration("duration", time.Since(startedAt)))
 	defer rows.Close()
 	// Get column types from sql.Rows.
 	types, err := rows.ColumnTypes()
 	if err != nil {
-		e.err = errs.Wrap(ErrRawSelectColumnTypes,
+		e.err = errs.Wrap(ErrSelectColumnTypes,
 			errs.WithCause(err),
 			errs.WithContext("query", e.query))
 		e.gari.errorLog(e.err.Error())
@@ -83,7 +83,7 @@ func (e *rawSelectExecutor) Exec(
 		// Scan values.
 		err = rows.Scan(args...)
 		if err != nil {
-			err = errs.Wrap(ErrRawSelectScan, errs.WithCause(err),
+			err = errs.Wrap(ErrSelectScan, errs.WithCause(err),
 				errs.WithContext("query", e.query))
 			e.gari.errorLog(err.Error())
 			return err
@@ -94,7 +94,7 @@ func (e *rawSelectExecutor) Exec(
 	}
 	// Check error
 	if rows.Err() != nil {
-		err = errs.Wrap(ErrRawSelectRows, errs.WithCause(err),
+		err = errs.Wrap(ErrSelectRows, errs.WithCause(err),
 			errs.WithContext("query", e.query))
 		e.gari.errorLog(err.Error())
 		return err
