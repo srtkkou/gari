@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/goark/errs"
 )
@@ -24,10 +22,8 @@ type (
 )
 
 var (
-	ErrInsertPrepare      = errors.New("gari.ErrInsertPrepare")
 	ErrInsertValuePtr     = errors.New("gari.ErrInsertValuePtr")
 	ErrInsertNoRecords    = errors.New("gari.ErrInsertNoRecords")
-	ErrInsertExec         = errors.New("gari.ErrInsertExec")
 	ErrInsertRowsAffected = errors.New("gari.ErrInsertRowsAffected")
 	ErrInsertRowCount     = errors.New("gari.ErrInsertRowCount")
 )
@@ -105,28 +101,9 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 		// Execute prepared statement.
 		query := e.query()
 		args := r.args()
-		startedAt := time.Now()
-		result, err := e.prepared.ExecContext(ctx, args...)
-		if err != nil {
-			e.err = errs.Wrap(ErrInsertExec, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args),
-				errs.WithContext("duration", time.Since(startedAt)))
-			e.gari().errorLog(e.err.Error())
-			return e.err
-		}
-		e.gari().infoLog("Execute INSERT SQL.",
-			slog.String("query", query),
-			slog.Any("args", args),
-			slog.Duration("duration", time.Since(startedAt)))
-		// Check row count.
-		count, err := result.RowsAffected()
-		if err != nil {
-			e.err = errs.Wrap(ErrInsertRowsAffected,
-				errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-			e.gari().errorLog(e.err.Error())
+		var count int64
+		_, count, e.err = e.gari().execPrepared(ctx, e.prepared, args...)
+		if e.err != nil {
 			return e.err
 		}
 		if count != 1 {
@@ -190,19 +167,7 @@ func (e *insertExecutor) query() string {
 
 // Prepare INSERT SQL statement.
 func (e *insertExecutor) prepareStmt() {
-	var err error
-	query := e.query()
-	startedAt := time.Now()
-	e.prepared, err = e.gari().db.Prepare(query)
-	if err != nil {
-		e.err = errs.Wrap(ErrInsertPrepare, errs.WithCause(err),
-			errs.WithContext("query", query),
-			errs.WithContext("duration", time.Since(startedAt)))
-		e.gari().errorLog(e.err.Error())
-	}
-	e.gari().infoLog("insertExecutor.prepareStmt()",
-		slog.String("query", query),
-		slog.Duration("duration", time.Since(startedAt)))
+	e.prepared, e.err = e.gari().prepare(e.query())
 }
 
 func (e *insertExecutor) gari() *Gari {

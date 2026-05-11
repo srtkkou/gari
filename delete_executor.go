@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/goark/errs"
 )
@@ -23,10 +21,8 @@ type (
 )
 
 var (
-	ErrDeletePrepare      = errors.New("gari.ErrDeletePrepare")
 	ErrDeleteValuePtr     = errors.New("gari.ErrDeleteValuePtr")
 	ErrDeleteNoRecords    = errors.New("gari.ErrDeleteNoRecords")
-	ErrDeleteExec         = errors.New("gari.ErrDeleteExec")
 	ErrDeleteRowsAffected = errors.New("gari.ErrDeleteRowsAffected")
 	ErrDeleteRowCount     = errors.New("gari.ErrDeleteRowCount")
 )
@@ -93,28 +89,9 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 		// Execute prepared statement.
 		query := e.query()
 		args := r.args()
-		startedAt := time.Now()
-		result, err := e.prepared.ExecContext(ctx, args...)
-		if err != nil {
-			e.err = errs.Wrap(ErrDeleteExec, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args),
-				errs.WithContext("duration", time.Since(startedAt)))
-			e.gari().errorLog(e.err.Error())
-			return e.err
-		}
-		e.gari().infoLog("Execute DELETE SQL.",
-			slog.String("query", query),
-			slog.Any("args", args),
-			slog.Duration("duration", time.Since(startedAt)))
-		// Check row count.
-		count, err := result.RowsAffected()
-		if err != nil {
-			e.err = errs.Wrap(ErrDeleteRowsAffected,
-				errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-			e.gari().errorLog(e.err.Error())
+		var count int64
+		_, count, e.err = e.gari().execPrepared(ctx, e.prepared, args...)
+		if e.err != nil {
 			return e.err
 		}
 		if count != 1 {
@@ -165,19 +142,7 @@ func (e *deleteExecutor) query() string {
 
 // Prepare DELETE SQL statement.
 func (e *deleteExecutor) prepareStmt() {
-	startedAt := time.Now()
-	var err error
-	query := e.query()
-	e.prepared, err = e.gari().db.Prepare(query)
-	if err != nil {
-		e.err = errs.Wrap(ErrDeletePrepare, errs.WithCause(err),
-			errs.WithContext("query", query),
-			errs.WithContext("duration", time.Since(startedAt)))
-		e.gari().errorLog(e.err.Error())
-	}
-	e.gari().infoLog("deleteExecutor.prepareStmt()",
-		slog.String("query", query),
-		slog.Duration("duration", time.Since(startedAt)))
+	e.prepared, e.err = e.gari().prepare(e.query())
 }
 
 func (e *deleteExecutor) gari() *Gari {

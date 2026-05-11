@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/goark/errs"
 )
@@ -24,10 +22,8 @@ type (
 )
 
 var (
-	ErrUpdatePrepare      = errors.New("gari.ErrUpdatePrepare")
 	ErrUpdateValuePtr     = errors.New("gari.ErrUpdateValuePtr")
 	ErrUpdateNoRecords    = errors.New("gari.ErrUpdateNoRecords")
-	ErrUpdateExec         = errors.New("gari.ErrUpdateExec")
 	ErrUpdateRowsAffected = errors.New("gari.ErrUpdateRowsAffected")
 	ErrUpdateRowCount     = errors.New("gari.ErrUpdateRowCount")
 )
@@ -108,28 +104,9 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 		// Execute prepared statement.
 		query := e.query()
 		args := r.args()
-		startedAt := time.Now()
-		result, err := e.prepared.ExecContext(ctx, args...)
-		if err != nil {
-			e.err = errs.Wrap(ErrUpdateExec, errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args),
-				errs.WithContext("duration", time.Since(startedAt)))
-			e.gari().errorLog(e.err.Error())
-			return e.err
-		}
-		e.gari().infoLog("Execute UPDATE SQL.",
-			slog.String("query", query),
-			slog.Any("args", args),
-			slog.Duration("duration", time.Since(startedAt)))
-		// Check row count.
-		count, err := result.RowsAffected()
-		if err != nil {
-			e.err = errs.Wrap(ErrUpdateRowsAffected,
-				errs.WithCause(err),
-				errs.WithContext("query", query),
-				errs.WithContext("args", args))
-			e.gari().errorLog(e.err.Error())
+		var count int64
+		_, count, e.err = e.gari().execPrepared(ctx, e.prepared, args...)
+		if e.err != nil {
 			return e.err
 		}
 		if count != 1 {
@@ -192,19 +169,7 @@ func (e *updateExecutor) query() string {
 
 // Prepare UPDATE SQL statement.
 func (e *updateExecutor) prepareStmt() {
-	startedAt := time.Now()
-	var err error
-	query := e.query()
-	e.prepared, err = e.gari().db.Prepare(query)
-	if err != nil {
-		e.err = errs.Wrap(ErrUpdatePrepare, errs.WithCause(err),
-			errs.WithContext("query", query),
-			errs.WithContext("duration", time.Since(startedAt)))
-		e.gari().errorLog(e.err.Error())
-	}
-	e.gari().infoLog("Prepare UPDATE SQL.",
-		slog.String("query", query),
-		slog.Duration("duration", time.Since(startedAt)))
+	e.prepared, e.err = e.gari().prepare(e.query())
 }
 
 func (e *updateExecutor) gari() *Gari {

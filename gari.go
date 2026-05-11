@@ -1,10 +1,12 @@
 package gari
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/goark/errs"
 )
@@ -38,7 +40,12 @@ type (
 )
 
 var (
-	ErrOption = errors.New("gari.ErrOption")
+	ErrOption          = errors.New("gari.ErrOption")
+	ErrSqlExec         = errors.New("gari.ErrSqlExec")
+	ErrLastInsertId    = errors.New("gari.ErrLastInsertId")
+	ErrRowsAffected    = errors.New("gari.ErrRowsAffected")
+	ErrSqlPrepare      = errors.New("gari.ErrSqlPrepare")
+	ErrSqlExecPrepared = errors.New("gari.ErrSqlExecPrepared")
 )
 
 // Open DB connection.
@@ -108,6 +115,100 @@ func (g *Gari) Select(query string) *selectExecutor {
 func (g *Gari) BeginTx() *txBuilder {
 	g.txBuilder = newTxBuilder(g)
 	return g.txBuilder
+}
+
+func (g *Gari) Exec(
+	ctx context.Context, query string, args ...any,
+) (int64, int64, error) {
+	startedAt := time.Now()
+	// Execute query.
+	result, err := g.db.ExecContext(ctx, query, args...)
+	duration := time.Since(startedAt)
+	if err != nil {
+		err = errs.Wrap(ErrSqlExec, errs.WithCause(err),
+			errs.WithContext("query", query),
+			errs.WithContext("args", args),
+			errs.WithContext("duration", duration))
+		g.errorLog(err.Error())
+		return 0, 0, err
+	}
+	id, count, err := g.parseSqlResult(result)
+	if err != nil {
+		return 0, 0, err
+	}
+	g.infoLog("gari.Exec",
+		slog.String("query", query),
+		slog.Any("args", args),
+		slog.Duration("duration", duration),
+		slog.Int64("lastInsertId", id),
+		slog.Int64("rowsAffected", count))
+	return id, count, nil
+}
+
+func (g *Gari) prepare(query string) (*sql.Stmt, error) {
+	startedAt := time.Now()
+	// Prepare query.
+	stmt, err := g.db.Prepare(query)
+	duration := time.Since(startedAt)
+	if err != nil {
+		err = errs.Wrap(ErrSqlPrepare, errs.WithCause(err),
+			errs.WithContext("query", query),
+			errs.WithContext("duration", duration))
+		g.errorLog(err.Error())
+		return nil, err
+	}
+	g.infoLog("gari.prepare",
+		slog.String("query", query),
+		slog.Duration("duration", duration))
+	return stmt, nil
+}
+
+func (g *Gari) execPrepared(
+	ctx context.Context, stmt *sql.Stmt, args ...any,
+) (int64, int64, error) {
+	startedAt := time.Now()
+	// Execute query.
+	result, err := stmt.ExecContext(ctx, args...)
+	duration := time.Since(startedAt)
+	if err != nil {
+		err = errs.Wrap(ErrSqlExecPrepared, errs.WithCause(err),
+			errs.WithContext("stmt", stmt),
+			errs.WithContext("args", args),
+			errs.WithContext("duration", duration))
+		g.errorLog(err.Error())
+		return 0, 0, err
+	}
+	id, count, err := g.parseSqlResult(result)
+	if err != nil {
+		return 0, 0, err
+	}
+	g.infoLog("gari.execPrepared",
+		slog.Any("stmt", stmt),
+		slog.Any("args", args),
+		slog.Duration("duration", duration),
+		slog.Int64("lastInsertId", id),
+		slog.Int64("rowsAffected", count))
+	return id, count, nil
+}
+
+func (g *Gari) parseSqlResult(result sql.Result) (int64, int64, error) {
+	// Parse last insert id.
+	id, err := result.LastInsertId()
+	if err != nil {
+		err = errs.Wrap(ErrLastInsertId, errs.WithCause(err),
+			errs.WithContext("result", result))
+		g.errorLog(err.Error())
+		return 0, 0, err
+	}
+	// Parse rows affected.
+	count, err := result.RowsAffected()
+	if err != nil {
+		err = errs.Wrap(ErrLastInsertId, errs.WithCause(err),
+			errs.WithContext("result", result))
+		g.errorLog(err.Error())
+		return 0, 0, err
+	}
+	return id, count, nil
 }
 
 // Output debug log.
