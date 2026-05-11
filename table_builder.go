@@ -2,6 +2,7 @@ package gari
 
 import (
 	"errors"
+	"time"
 
 	"github.com/goark/errs"
 )
@@ -28,7 +29,25 @@ func (b *TableBuilder) IdColumn() *TableBuilder {
 func (b *TableBuilder) TimeStampColumns() *TableBuilder {
 	b.TimeColumn("created_at", DefaultNull())
 	b.TimeColumn("updated_at", DefaultNull())
-	// TODO: Add table callback to update them.
+	// Add hooks to update timestamps.
+	b.table.addHook(BeforeInsert, func(r *Record) {
+		now := time.Now().UTC()
+		createdAtValue, ok := r.m["created_at"]
+		if ok {
+			createdAtValue.raw = now
+		}
+		updatedAtValue, ok := r.m["updated_at"]
+		if ok {
+			updatedAtValue.raw = now
+		}
+	})
+	b.table.addHook(BeforeUpdate, func(r *Record) {
+		now := time.Now().UTC()
+		updatedAtValue, ok := r.m["updated_at"]
+		if ok {
+			updatedAtValue.raw = now
+		}
+	})
 	return b
 }
 

@@ -13,13 +13,6 @@ import (
 type (
 	// Table
 	Table struct {
-		BeforeInsert func(r *Record)
-		AfterInsert  func(r *Record)
-		BeforeUpdate func(r *Record)
-		AfterUpdate  func(r *Record)
-		BeforeDelete func(r *Record)
-		AfterDelete  func(r *Record)
-
 		gari           *Gari              // Pointer to gari config.
 		name           string             // Table name.
 		columns        []*column          // Slice of pointer to columns.
@@ -28,6 +21,13 @@ type (
 		insertExecutor *insertExecutor    // Executor to execute INSERT SQL.
 		updateExecutor *updateExecutor    // Executor to execute UPDATE SQL.
 		deleteExecutor *deleteExecutor    // Executor to execute DELETE SQL.
+
+		beforeInsertHooks []HookFunc
+		afterInsertHooks  []HookFunc
+		beforeUpdateHooks []HookFunc
+		afterUpdateHooks  []HookFunc
+		beforeDeleteHooks []HookFunc
+		afterDeleteHooks  []HookFunc
 	}
 )
 
@@ -37,13 +37,13 @@ var (
 
 // Create new table.
 func newTable(g *Gari, name string) *Table {
-	t := Table{
+	t := &Table{
 		gari:      g,
 		name:      name,
 		columns:   make([]*column, 0),
 		columnMap: make(map[string]*column, 0),
 	}
-	return &t
+	return t
 }
 
 // Table name.
@@ -132,6 +132,24 @@ func (t *Table) Migrate(ctx context.Context) error {
 		slog.String("query", query),
 		slog.Duration("duration", time.Since(startedAt)))
 	return nil
+}
+
+func (t *Table) addHook(ht HookType, hf HookFunc) bool {
+	switch ht {
+	case BeforeInsert:
+		t.beforeInsertHooks = append(t.beforeInsertHooks, hf)
+	case AfterInsert:
+		t.afterInsertHooks = append(t.afterInsertHooks, hf)
+	case BeforeUpdate:
+		t.beforeUpdateHooks = append(t.beforeUpdateHooks, hf)
+	case AfterUpdate:
+		t.afterUpdateHooks = append(t.afterUpdateHooks, hf)
+	case BeforeDelete:
+		t.beforeDeleteHooks = append(t.beforeDeleteHooks, hf)
+	case AfterDelete:
+		t.afterDeleteHooks = append(t.afterDeleteHooks, hf)
+	}
+	return true
 }
 
 // Close prepared statements.

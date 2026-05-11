@@ -34,7 +34,7 @@ var (
 
 // Create new updateExecutor instance.
 func newUpdateExecutor(t *Table) *updateExecutor {
-	e := updateExecutor{
+	e := &updateExecutor{
 		table:   t,
 		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
@@ -46,7 +46,7 @@ func newUpdateExecutor(t *Table) *updateExecutor {
 		}
 		e.columns = append(e.columns, col)
 	}
-	return &e
+	return e
 }
 
 // Add values to update.
@@ -98,10 +98,12 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 		return e.err
 	}
 	for _, r := range e.records {
-		// Before update callback.
-		if e.table.BeforeUpdate != nil {
+		// Before UPDATE hooks.
+		if len(e.table.beforeUpdateHooks) > 0 {
 			e.gari().debugLog("gari.Table.BeforeUpdate")
-			e.table.BeforeUpdate(r)
+			for _, hook := range e.table.beforeUpdateHooks {
+				hook(r)
+			}
 		}
 		// Execute prepared statement.
 		query := e.query()
@@ -138,10 +140,12 @@ func (e *updateExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// After update callback.
-		if e.table.AfterUpdate != nil {
+		// After UPDATE hooks.
+		if len(e.table.afterUpdateHooks) > 0 {
 			e.gari().debugLog("gari.Table.AfterUpdate")
-			e.table.AfterUpdate(r)
+			for _, hook := range e.table.afterUpdateHooks {
+				hook(r)
+			}
 		}
 	}
 	return nil

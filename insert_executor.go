@@ -34,7 +34,7 @@ var (
 
 // Create new insertExecutor instance.
 func newInsertExecutor(t *Table) *insertExecutor {
-	e := insertExecutor{
+	e := &insertExecutor{
 		table:   t,
 		columns: make([]*column, 0, (len(t.columns) - 1)),
 		records: make([]*Record, 0),
@@ -47,7 +47,7 @@ func newInsertExecutor(t *Table) *insertExecutor {
 		}
 		e.columns = append(e.columns, col)
 	}
-	return &e
+	return e
 }
 
 // Add values to insert.
@@ -95,10 +95,12 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 		return e.err
 	}
 	for _, r := range e.records {
-		// Before insert callback.
-		if e.table.BeforeInsert != nil {
+		// Before INSERT hooks.
+		if len(e.table.beforeInsertHooks) > 0 {
 			e.gari().debugLog("gari.Table.BeforeInsert")
-			e.table.BeforeInsert(r)
+			for _, hook := range e.table.beforeInsertHooks {
+				hook(r)
+			}
 		}
 		// Execute prepared statement.
 		query := e.query()
@@ -135,10 +137,12 @@ func (e *insertExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// After insert callback.
-		if e.table.AfterInsert != nil {
+		// After INSERT hooks.
+		if len(e.table.afterInsertHooks) > 0 {
 			e.gari().debugLog("gari.Table.AfterInsert")
-			e.table.AfterInsert(r)
+			for _, hook := range e.table.afterInsertHooks {
+				hook(r)
+			}
 		}
 	}
 	return nil

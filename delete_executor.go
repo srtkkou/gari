@@ -33,11 +33,11 @@ var (
 
 // Create new deleteExecutor instance.
 func newDeleteExecutor(t *Table) *deleteExecutor {
-	e := deleteExecutor{
+	e := &deleteExecutor{
 		table:   t,
 		records: make([]*Record, 0),
 	}
-	return &e
+	return e
 }
 
 // Add values to dalete.
@@ -83,10 +83,12 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 		return e.err
 	}
 	for _, r := range e.records {
-		// Before delete callback.
-		if e.table.BeforeDelete != nil {
+		// Before DELETE hooks.
+		if len(e.table.beforeDeleteHooks) > 0 {
 			e.gari().debugLog("gari.Table.BeforeDelete")
-			e.table.BeforeDelete(r)
+			for _, hook := range e.table.beforeDeleteHooks {
+				hook(r)
+			}
 		}
 		// Execute prepared statement.
 		query := e.query()
@@ -123,10 +125,12 @@ func (e *deleteExecutor) Exec(ctx context.Context) error {
 			e.gari().errorLog(e.err.Error())
 			return e.err
 		}
-		// After delete callback.
-		if e.table.AfterDelete != nil {
+		// After DELETE hooks.
+		if len(e.table.afterDeleteHooks) > 0 {
 			e.gari().debugLog("gari.Table.AfterDelete")
-			e.table.AfterDelete(r)
+			for _, hook := range e.table.afterDeleteHooks {
+				hook(r)
+			}
 		}
 	}
 	return nil
