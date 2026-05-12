@@ -6,21 +6,34 @@ import (
 )
 
 var (
-	// アンダーバーの正規表現
+	reUpper    = regexp.MustCompile(`[A-Z]`)
 	reUnderbar = regexp.MustCompile(`_(.)`)
 )
 
-// スネークケースを小文字キャメルケースに変換する。
-// * snake_case -> lowerCamelCase
+// Convert snake-case string to lower camel-case.
+// * snake_case -> snakeCase
 func snakeToLowerCamelCase(str string) string {
 	return strings.ReplaceAll(
 		reUnderbar.ReplaceAllStringFunc(str, strings.ToUpper),
 		"_", "")
 }
 
-// スネークケースを大文字キャメルケースに変換する。
-// * snake_case -> UpperCamelCase
+// Convert snake-case string to upper camel-case.
+// * snake_case -> SnakeCase
 func snakeToUpperCamelCase(str string) string {
 	s := snakeToLowerCamelCase(str)
 	return strings.ToUpper(s[0:1]) + s[1:]
+}
+
+// Convert upper camel-case string to snake-case.
+// * UpperCamelCase -> upper_camel_case
+func UpperCamelToSnakeCase(input string) string {
+	str := reUpper.ReplaceAllStringFunc(input,
+		func(matched string) string {
+			return "_" + strings.ToLower(matched)
+		})
+	if str[0:1] == "_" {
+		return str[1:]
+	}
+	return str
 }
