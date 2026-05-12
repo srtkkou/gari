@@ -37,6 +37,10 @@ func newSelectExecutor(g *Gari, query string) *selectExecutor {
 	return &e
 }
 
+func (e *selectExecutor) AssignTo(ptrs any) *selectExecutor {
+	return e
+}
+
 // Execute SELECT SQL query.
 func (e *selectExecutor) Exec(
 	ctx context.Context, fn func(r *Record),
