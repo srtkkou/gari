@@ -20,20 +20,16 @@ type (
 		Warn   func(msg string, args ...any) // Warn level log func.
 		Error  func(msg string, args ...any) // Error level log func.
 
-		BeforeInsert func(r *Record)
-		AfterInsert  func(r *Record)
-		BeforeUpdate func(r *Record)
-		AfterUpdate  func(r *Record)
-		BeforeDelete func(r *Record)
-		AfterDelete  func(r *Record)
+		db          *sql.DB // Pointer to database pool.
+		isClosed    bool    // Flag to see if db is closed.
+		dialect     Dialect // Dialects of DB.
+		stringQuote string  // Quotation of strings.
+		idQuote     string  // Quotation of identifiers.
 
-		db          *sql.DB    // Pointer to database pool.
-		isClosed    bool       // Flag to see if db is closed.
-		dialect     Dialect    // Dialects of DB.
-		stringQuote string     // Quotation of strings.
-		idQuote     string     // Quotation of identifiers.
-		tables      []*Table   // Pointer to tables.
-		txBuilder   *txBuilder // Pointer to txBuilder.
+		tables   []*Table          // Slice of table ptrs.
+		tableMap map[string]*Table // Map of table ptrs.
+
+		txBuilder *txBuilder // Pointer to txBuilder.
 	}
 	// Option func.
 	OptionFunc func(*Gari) error
@@ -50,13 +46,14 @@ var (
 
 // Open DB connection.
 func Open(db *sql.DB, dialect Dialect, fns ...OptionFunc) (*Gari, error) {
-	g := Gari{
+	g := &Gari{
 		db:          db,
 		isClosed:    false,
 		dialect:     dialect,
 		stringQuote: `'`,
 		idQuote:     `"`,
 		tables:      make([]*Table, 0),
+		tableMap:    make(map[string]*Table, 0),
 	}
 	// Setup logger.
 	logOpts := slog.HandlerOptions{Level: slog.LevelDebug}
@@ -67,12 +64,12 @@ func Open(db *sql.DB, dialect Dialect, fns ...OptionFunc) (*Gari, error) {
 	g.Error = g.Logger.Error
 	// Parse options.
 	for _, fn := range fns {
-		if err := fn(&g); err != nil {
+		if err := fn(g); err != nil {
 			err = errs.Wrap(ErrOption, errs.WithCause(err))
 			return nil, err
 		}
 	}
-	return &g, nil
+	return g, nil
 }
 
 // Close connection.
@@ -99,10 +96,20 @@ func (g *Gari) Close() error {
 
 // Start table builder sequence.
 func (g *Gari) Table(name string) *TableBuilder {
-	b := TableBuilder{
-		table: newTable(g, name),
-	}
-	g.tables = append(g.tables, b.table)
+	table := newTable(g, name)
+	b := TableBuilder{table: table}
+	g.addTable(table)
+	return &b
+}
+
+// Start schema builder sequence.
+func (g *Gari) TableWithSchema(
+	name, schemaName string,
+) *TableBuilder {
+	table := newTable(g, name)
+	table.SchemaName = schemaName
+	b := TableBuilder{table: table}
+	g.addTable(table)
 	return &b
 }
 
@@ -209,6 +216,11 @@ func (g *Gari) parseSqlResult(result sql.Result) (int64, int64, error) {
 		return 0, 0, err
 	}
 	return id, count, nil
+}
+
+func (g *Gari) addTable(table *Table) {
+	g.tables = append(g.tables, table)
+	g.tableMap[table.Name] = table
 }
 
 // Output debug log.
