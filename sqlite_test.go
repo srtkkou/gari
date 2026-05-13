@@ -62,19 +62,25 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	// SELECT.
 	results := make([]testModel, 0)
+	//result := testModel{}
 	err = g.Select(
 		`SELECT "id", "created_at", "updated_at", "deleted_at",
 		"num", "text" FROM "test_models" ORDER BY "id" ASC;`,
-	).Exec(ctx, func(r *gari.Record) {
-		m := testModel{}
-		r.SetInt("id", &m.Id)
-		r.SetTime("created_at", &m.CreatedAt)
-		r.SetTime("updated_at", &m.UpdatedAt)
-		r.SetNullTime("deleted_at", &m.DeletedAt)
-		r.SetInt("num", &m.Num)
-		r.SetString("text", &m.Text)
-		results = append(results, m)
-	})
+	).AssignTo(&results).Exec(ctx,
+		gari.CamelToSnakeMapper(&results),
+		/*
+			func(r *gari.Record) {
+				m := testModel{}
+			r.SetInt("id", &m.Id)
+			r.SetTime("created_at", &m.CreatedAt)
+			r.SetTime("updated_at", &m.UpdatedAt)
+			r.SetNullTime("deleted_at", &m.DeletedAt)
+			r.SetInt("num", &m.Num)
+			r.SetString("text", &m.Text)
+			results = append(results, m)
+			}
+		*/
+	)
 	require.NoError(t, err)
 	// Check result.
 	require.Equal(t, len(models), len(results))
