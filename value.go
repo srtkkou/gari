@@ -8,21 +8,19 @@ import (
 	"strings"
 )
 
-type (
-	// Value to store DB value.
-	value struct {
-		tableName  string // Table name.
-		columnName string // Column name.
-		fieldName  string // Golang struct field name.
-		kind       kind   // Kind.
-		dbType     string // DB type name.
-		length     int64  // Length of DB column.
-		precision  int64  // Decimal precision of DB column.
-		scale      int64  // Decimal scale of DB column.
-		isNullable bool   // Allow nil for DB column.
-		raw        any    // Raw value.
-	}
-)
+// Value to store DB value.
+type value struct {
+	tableName  string // Table name.
+	columnName string // Column name.
+	fieldName  string // Golang struct field name.
+	kind       kind   // Kind.
+	dbType     string // DB type name.
+	length     int64  // Length of DB column.
+	precision  int64  // Decimal precision of DB column.
+	scale      int64  // Decimal scale of DB column.
+	isNullable bool   // Allow nil for DB column.
+	raw        any    // Raw value.
+}
 
 var (
 	ErrValueScan = errors.New("gari.ErrValueScan")
@@ -32,8 +30,7 @@ var (
 func newValueByColumn(col *column) *value {
 	v := &value{}
 	v.tableName = col.table.Name
-	v.columnName = col.name
-	v.fieldName = col.fieldName
+	v.columnName = col.Name
 	v.kind = col.kind
 	v.dbType = col.dbType
 	v.length = col.length

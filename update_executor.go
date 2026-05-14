@@ -9,17 +9,15 @@ import (
 	"github.com/goark/errs"
 )
 
-type (
-	// Executor to run UPDATE SQL.
-	updateExecutor struct {
-		table      *Table    // Pointer to table.
-		columns    []*column // Slice of column pointers.
-		queryCache string    // UPDATE SQL query cache.
-		prepared   *sql.Stmt // Prepared statement pointer.
-		records    []*Record // Records to update.
-		err        error     // Error.
-	}
-)
+// Executor to run UPDATE SQL.
+type updateExecutor struct {
+	table      *Table    // Pointer to table.
+	columns    []*column // Slice of column pointers.
+	queryCache string    // UPDATE SQL query cache.
+	prepared   *sql.Stmt // Prepared statement pointer.
+	records    []*Record // Records to update.
+	err        error     // Error.
+}
 
 var (
 	ErrUpdateValuePtr     = errors.New("gari.ErrUpdateValuePtr")
@@ -68,7 +66,8 @@ func (e *updateExecutor) Values(ptrs ...any) *updateExecutor {
 		values := make([]*value, len(columns))
 		for i, col := range columns {
 			values[i] = newValueByColumn(col)
-			values[i].raw = m[col.fieldName]
+			fieldName := e.table.mapper.FieldNameOf(col.Name)
+			values[i].raw = m[fieldName]
 		}
 		r := newRecord(values)
 		e.records = append(e.records, r)
@@ -152,14 +151,14 @@ func (e *updateExecutor) query() string {
 		if count > 0 {
 			sb.WriteString(`, `)
 		}
-		dialect.QuoteColumn(&sb, col.name)
+		dialect.QuoteColumn(&sb, col.Name)
 		sb.WriteString(` = `)
 		dialect.BindVar(&sb, count)
 		count++
 	}
 	// Add WHERE statement.
 	sb.WriteString(` WHERE `)
-	dialect.QuoteColumn(&sb, e.table.pkey.name)
+	dialect.QuoteColumn(&sb, e.table.pkey.Name)
 	sb.WriteString(` = `)
 	dialect.BindVar(&sb, count)
 	dialect.QuerySuffix(&sb)

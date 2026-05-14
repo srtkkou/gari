@@ -9,16 +9,14 @@ import (
 	"github.com/goark/errs"
 )
 
-type (
-	// Executor to run DELETE SQL.
-	deleteExecutor struct {
-		table      *Table    // Pointer to table.
-		queryCache string    // DELETE SQL query cache.
-		prepared   *sql.Stmt // Prepared statement pointer.
-		records    []*Record // Records to update.
-		err        error     // Error.
-	}
-)
+// Executor to run DELETE SQL.
+type deleteExecutor struct {
+	table      *Table    // Pointer to table.
+	queryCache string    // DELETE SQL query cache.
+	prepared   *sql.Stmt // Prepared statement pointer.
+	records    []*Record // Records to update.
+	err        error     // Error.
+}
 
 var (
 	ErrDeleteValuePtr     = errors.New("gari.ErrDeleteValuePtr")
@@ -54,7 +52,8 @@ func (e *deleteExecutor) Values(ptrs ...any) *deleteExecutor {
 		// Build record.
 		values := make([]*value, 1)
 		values[0] = newValueByColumn(e.table.pkey)
-		values[0].raw = m[e.table.pkey.fieldName]
+		fieldName := e.table.mapper.FieldNameOf(e.table.pkey.Name)
+		values[0].raw = m[fieldName]
 		r := newRecord(values)
 		e.records = append(e.records, r)
 	}
@@ -132,7 +131,7 @@ func (e *deleteExecutor) query() string {
 	dialect.QuoteTable(&sb, e.table.Name)
 	// Add WHERE statement.
 	sb.WriteString(" WHERE ")
-	dialect.QuoteColumn(&sb, e.table.pkey.name)
+	dialect.QuoteColumn(&sb, e.table.pkey.Name)
 	sb.WriteString(" = ")
 	dialect.BindVar(&sb, 0)
 	dialect.QuerySuffix(&sb)

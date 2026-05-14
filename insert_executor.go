@@ -9,17 +9,15 @@ import (
 	"github.com/goark/errs"
 )
 
-type (
-	// Executor to run INSERT SQL.
-	insertExecutor struct {
-		table      *Table    // Pointer to table.
-		columns    []*column // Slice of columns except primary key.
-		queryCache string    // INSERT SQL query cache.
-		prepared   *sql.Stmt // Prepared statement pointer.
-		records    []*Record // Records to insert.
-		err        error     // Error.
-	}
-)
+// Executor to run INSERT SQL.
+type insertExecutor struct {
+	table      *Table    // Pointer to table.
+	columns    []*column // Slice of columns except primary key.
+	queryCache string    // INSERT SQL query cache.
+	prepared   *sql.Stmt // Prepared statement pointer.
+	records    []*Record // Records to insert.
+	err        error     // Error.
+}
 
 var (
 	ErrInsertValuePtr     = errors.New("gari.ErrInsertValuePtr")
@@ -65,7 +63,8 @@ func (e *insertExecutor) Values(ptrs ...any) *insertExecutor {
 		values := make([]*value, len(e.columns))
 		for i, col := range e.columns {
 			values[i] = newValueByColumn(col)
-			values[i].raw = m[col.fieldName]
+			fieldName := e.table.mapper.FieldNameOf(col.Name)
+			values[i].raw = m[fieldName]
 		}
 		r := newRecord(values)
 		e.records = append(e.records, r)
@@ -149,7 +148,7 @@ func (e *insertExecutor) query() string {
 		if i > 0 {
 			sb.WriteString(`, `)
 		}
-		dialect.QuoteColumn(&sb, col.name)
+		dialect.QuoteColumn(&sb, col.Name)
 	}
 	// Add value placeholders.
 	sb.WriteString(`) VALUES (`)

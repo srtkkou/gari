@@ -21,6 +21,6 @@ func TestTable(t *testing.T) {
 	idCol := newColumn(tb, "id")
 	idCol.kind = kindString
 	tb.columns = []*column{idCol}
-	tb.columnMap[idCol.name] = idCol
+	tb.columnMap[idCol.Name] = idCol
 	require.NotEmpty(t, idCol.kind)
 }

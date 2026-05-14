@@ -8,15 +8,14 @@ import (
 	"github.com/goark/errs"
 )
 
-type (
-	// Options to define column.
-	ColumnOption func(*columnBuilder)
-	// Column builder
-	columnBuilder struct {
-		column *column // Pointer to column.
-		err    error   // Error
-	}
-)
+// Options to define column.
+type ColumnOption func(*columnBuilder)
+
+// Column builder
+type columnBuilder struct {
+	column *column // Pointer to column.
+	err    error   // Error
+}
 
 var (
 	ErrMultiplePrimaryKeys = errors.New("gari.ErrMultiplePrimaryKeys")
@@ -30,13 +29,6 @@ func newColumnBuilder(col *column) *columnBuilder {
 	return &columnBuilder{
 		column: col,
 	}
-}
-
-// Set field name.
-func FieldName(name string) ColumnOption {
-	return setColumnOption(func(b *columnBuilder) {
-		b.column.fieldName = name
-	})
 }
 
 // Set primary key flag.
@@ -92,7 +84,7 @@ func DefaultString(str string) ColumnOption {
 		// Validate field size.
 		if b.column.length < int64(len(str)) {
 			b.err = errs.Wrap(ErrDefaultValueSize,
-				errs.WithContext("columnName", b.column.name),
+				errs.WithContext("columnName", b.column.Name),
 				errs.WithContext("input", str),
 				errs.WithContext("length", b.column.length))
 			return
@@ -132,7 +124,7 @@ func setColumnOption(
 func (b *columnBuilder) validateKind(kinds ...string) error {
 	if !slices.Contains(kinds, b.column.kind) {
 		return errs.Wrap(ErrDefaultValueKind,
-			errs.WithContext("columnName", b.column.name),
+			errs.WithContext("columnName", b.column.Name),
 			errs.WithContext("kind", b.column.kind))
 	}
 	return nil

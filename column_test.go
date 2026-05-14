@@ -36,7 +36,7 @@ func TestColumnDefaultString(t *testing.T) {
 				StringColumn("text", DefaultString(test.input)).
 				Define()
 			require.NoError(t, err)
-			col := table.column("text")
+			col := table.columnByName("text")
 			require.NotNil(t, col)
 			require.Equal(t, test.input, col.defaultValue)
 		})
