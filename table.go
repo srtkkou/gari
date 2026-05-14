@@ -2,12 +2,7 @@ package gari
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
-	"time"
-
-	"github.com/goark/errs"
 )
 
 type (
@@ -31,10 +26,6 @@ type (
 		beforeDeleteHooks []HookFunc
 		afterDeleteHooks  []HookFunc
 	}
-)
-
-var (
-	ErrTableMigrate = errors.New("gari.ErrTableMigrate")
 )
 
 // Create new table.
@@ -107,28 +98,8 @@ func (t *Table) Delete() *deleteExecutor {
 
 // Execute DDL SQL to migrate table.
 func (t *Table) Migrate(ctx context.Context) error {
-	// Build DDL SQL.
-	query, err := newDdlBuilder(t).build()
-	if err != nil {
-		err = errs.Wrap(ErrTableMigrate, errs.WithCause(err))
-		t.gari.errorLog(err.Error())
-		return err
-	}
-	// Execute query.
-	db := t.gari.db
-	startedAt := time.Now()
-	_, err = db.ExecContext(ctx, query)
-	if err != nil {
-		err = errs.Wrap(ErrTableMigrate, errs.WithCause(err),
-			errs.WithContext("query", query),
-			errs.WithContext("duration", time.Since(startedAt)))
-		t.gari.errorLog(err.Error())
-		return err
-	}
-	t.gari.infoLog("Table.Migrate()",
-		slog.String("query", query),
-		slog.Duration("duration", time.Since(startedAt)))
-	return nil
+	m := newMigrator(t)
+	return m.exec(ctx)
 }
 
 func (t *Table) addHook(ht HookType, hf HookFunc) bool {
