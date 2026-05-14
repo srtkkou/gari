@@ -75,9 +75,9 @@ func TestSqlmock(t *testing.T) {
 	require.NoError(t, err)
 	// SELECT.
 	models := make([]testModel, 0)
-	err = g.Select(`
-		SELECT * FROM "test_models" ORDER BY "num" ASC;
-	`).Exec(ctx, func(r *gari.Record) {
+	err = g.Select(&models,
+		`SELECT * FROM "test_models" ORDER BY "num" ASC;`,
+	).Exec(ctx, func(r *gari.Record) {
 		m := testModel{}
 		r.SetInt("id", &m.Id)
 		r.SetTime("created_at", &m.CreatedAt)

@@ -63,11 +63,12 @@ func TestSqlite(t *testing.T) {
 	// SELECT.
 	results := make([]testModel, 0)
 	//result := testModel{}
-	err = g.Select(
+	err = g.Select(&results,
 		`SELECT "id", "created_at", "updated_at", "deleted_at",
 		"num", "text" FROM "test_models" ORDER BY "id" ASC;`,
 	).Exec(ctx,
-		gari.CamelToSnakeMapper(&results),
+		func(r *gari.Record) {},
+		//gari.CamelToSnakeMapper(&results),
 		/*
 			func(r *gari.Record) {
 				m := testModel{}
