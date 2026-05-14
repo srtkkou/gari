@@ -31,7 +31,7 @@ var (
 // Create new Value struct by *column.
 func newValueByColumn(col *column) *value {
 	v := &value{}
-	v.tableName = col.table.name
+	v.tableName = col.table.Name
 	v.columnName = col.name
 	v.fieldName = col.fieldName
 	v.kind = col.kind

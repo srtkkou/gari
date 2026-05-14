@@ -129,7 +129,7 @@ func (e *deleteExecutor) query() string {
 	var sb strings.Builder
 	sb.WriteString("DELETE FROM ")
 	// Add table name.
-	dialect.QuoteTable(&sb, e.table.name)
+	dialect.QuoteTable(&sb, e.table.Name)
 	// Add WHERE statement.
 	sb.WriteString(" WHERE ")
 	dialect.QuoteColumn(&sb, e.table.pkey.name)

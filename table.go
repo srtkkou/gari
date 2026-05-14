@@ -13,8 +13,10 @@ import (
 type (
 	// Table
 	Table struct {
+		Name       string // Table name.
+		SchemaName string // Schema name.
+
 		gari           *Gari              // Pointer to gari config.
-		name           string             // Table name.
 		columns        []*column          // Slice of pointer to columns.
 		columnMap      map[string]*column // Map of columns.
 		pkey           *column            // Pointer to PRIMARY KEY column.
@@ -38,17 +40,12 @@ var (
 // Create new table.
 func newTable(g *Gari, name string) *Table {
 	t := &Table{
+		Name:      name,
 		gari:      g,
-		name:      name,
 		columns:   make([]*column, 0),
 		columnMap: make(map[string]*column, 0),
 	}
 	return t
-}
-
-// Table name.
-func (t *Table) Name() string {
-	return t.name
 }
 
 // Column names.
@@ -64,7 +61,7 @@ func (t *Table) ColumnNames() []string {
 func (t *Table) FullColumnNames() []string {
 	names := make([]string, len(t.columns))
 	for i, col := range t.columns {
-		names[i] = fmt.Sprintf("%s.%s", t.name, col.name)
+		names[i] = fmt.Sprintf("%s.%s", t.Name, col.name)
 	}
 	return names
 }

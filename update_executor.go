@@ -144,7 +144,7 @@ func (e *updateExecutor) query() string {
 	var sb strings.Builder
 	sb.WriteString("UPDATE ")
 	// Add table name.
-	dialect.QuoteTable(&sb, e.table.name)
+	dialect.QuoteTable(&sb, e.table.Name)
 	sb.WriteString(" SET ")
 	// Add column names and placeholders.
 	count := 0

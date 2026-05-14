@@ -142,7 +142,7 @@ func (e *insertExecutor) query() string {
 	var sb strings.Builder
 	sb.WriteString(`INSERT INTO `)
 	// Add table name.
-	dialect.QuoteTable(&sb, e.table.name)
+	dialect.QuoteTable(&sb, e.table.Name)
 	sb.WriteString(` (`)
 	// Add column names.
 	for i, col := range e.columns {
