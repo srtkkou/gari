@@ -27,7 +27,7 @@ func snakeToUpperCamelCase(str string) string {
 
 // Convert upper camel-case string to snake-case.
 // * UpperCamelCase -> upper_camel_case
-func UpperCamelToSnakeCase(input string) string {
+func upperCamelToSnakeCase(input string) string {
 	str := reUpper.ReplaceAllStringFunc(input,
 		func(matched string) string {
 			return "_" + strings.ToLower(matched)
