@@ -12,7 +12,6 @@ import (
 type value struct {
 	tableName  string // Table name.
 	columnName string // Column name.
-	fieldName  string // Golang struct field name.
 	kind       kind   // Kind.
 	dbType     string // DB type name.
 	length     int64  // Length of DB column.
@@ -52,7 +51,6 @@ func newValueByColumnType(t *sql.ColumnType) *value {
 		v.tableName = tokens[0]
 		v.columnName = tokens[len(tokens)-1]
 	}
-	v.fieldName = snakeToUpperCamelCase(v.columnName)
 	v.dbType = t.DatabaseTypeName()
 	switch strings.ToUpper(v.dbType) {
 	case "VARCHAR", "TEXT":
@@ -85,8 +83,6 @@ func (v *value) String() string {
 	sb.WriteString(strconv.Quote(v.tableName))
 	sb.WriteString(`,"columnName":`)
 	sb.WriteString(strconv.Quote(v.columnName))
-	sb.WriteString(`,"fieldName":`)
-	sb.WriteString(strconv.Quote(v.fieldName))
 	sb.WriteString(`,"kind":`)
 	sb.WriteString(strconv.Quote(v.kind))
 	sb.WriteString(`,"dbType":`)

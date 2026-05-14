@@ -22,7 +22,6 @@ func newRecord(values []*value) *Record {
 	}
 	for _, value := range values {
 		r.m[value.columnName] = value
-		r.m[value.fieldName] = value
 	}
 	return r
 }
@@ -45,14 +44,6 @@ func (r *Record) ColumnNames() []string {
 	names := make([]string, len(r.values))
 	for i, value := range r.values {
 		names[i] = value.columnName
-	}
-	return names
-}
-
-func (r *Record) FieldNames() []string {
-	names := make([]string, len(r.values))
-	for i, value := range r.values {
-		names[i] = value.fieldName
 	}
 	return names
 }
@@ -152,4 +143,9 @@ func (r *Record) args() []any {
 		args[i] = value.arg()
 	}
 	return args
+}
+
+func (r *Record) valueByName(name string) (*value, bool) {
+	v, ok := r.m[name]
+	return v, ok
 }
