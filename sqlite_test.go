@@ -61,7 +61,8 @@ func TestSqlite(t *testing.T) {
 	err = table.Insert().Values(args...).Exec(ctx)
 	require.NoError(t, err)
 	// SELECT.
-	results := make([]testModel, 0)
+	var results []testModel
+	//	results := make([]testModel, 0)
 	//result := testModel{}
 	err = g.Select(&results,
 		`SELECT "id", "created_at", "updated_at", "deleted_at",

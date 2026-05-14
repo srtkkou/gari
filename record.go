@@ -153,3 +153,8 @@ func (r *Record) args() []any {
 	}
 	return args
 }
+
+func (r *Record) valueByName(name string) (*value, bool) {
+	v, ok := r.m[name]
+	return v, ok
+}
