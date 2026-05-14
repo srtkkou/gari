@@ -7,33 +7,31 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
-type (
-	// 列
-	column struct {
-		table           *Table            // Pointer to table.
-		name            string            // Column name.
-		fieldName       string            // Golang struct Field name.
-		kind            kind              // Kind.
-		dbType          string            // DB type name.
-		length          int64             // Length of DB column.
-		precision       int64             // Decimal precision of DB column.
-		scale           int64             // Decimal precision of DB column.
-		isNullable      bool              // Allow nil for DB column.
-		defaultExists   bool              // Default value is set.
-		defaultValue    any               // Default raw value.
-		isPrimary       bool              // Primary key.
-		isAutoIncrement bool              // Set auto-increment for isPrimary key.
-		rules           []validation.Rule // Validation rules.
-		queryCache      string            //Cached DDL SQL statement.
-	}
-)
+// Table column.
+type column struct {
+	Name string // Column name.
+
+	table           *Table // Pointer to table.
+	kind            kind   // Kind.
+	dbType          string // DB type name.
+	length          int64  // Length of DB column.
+	precision       int64  // Decimal precision of DB column.
+	scale           int64  // Decimal precision of DB column.
+	isNullable      bool   // Allow nil for DB column.
+	defaultExists   bool   // Default value is set.
+	defaultValue    any    // Default raw value.
+	isPrimary       bool   // Primary key.
+	isAutoIncrement bool   // Set auto-increment for isPrimary key.
+	queryCache      string //Cached DDL SQL statement.
+
+	rules []validation.Rule // Validation rules.
+}
 
 // Create new column.
 func newColumn(t *Table, name string) *column {
 	c := &column{
+		Name:       name,
 		table:      t,
-		name:       name,
-		fieldName:  snakeToUpperCamelCase(name),
 		length:     255,
 		isNullable: true,
 		rules:      make([]validation.Rule, 0),
@@ -46,9 +44,7 @@ func (c *column) String() string {
 	var sb strings.Builder
 	sb.WriteString(`{"type":"gari.column"`)
 	sb.WriteString(`,"name":`)
-	sb.WriteString(strconv.Quote(c.name))
-	sb.WriteString(`,"fieldName":`)
-	sb.WriteString(strconv.Quote(c.fieldName))
+	sb.WriteString(strconv.Quote(c.Name))
 	sb.WriteString(`,"kind":`)
 	sb.WriteString(strconv.Quote(c.kind))
 	sb.WriteString(`,"query":`)
@@ -66,7 +62,7 @@ func (c *column) query() string {
 	dialect := c.gari().dialect
 	var sb strings.Builder
 	// Name.
-	sb.WriteString(c.name)
+	sb.WriteString(c.Name)
 	sb.WriteString(` `)
 	// Type
 	switch c.kind {

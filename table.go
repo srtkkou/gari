@@ -5,28 +5,27 @@ import (
 	"fmt"
 )
 
-type (
-	// Table
-	Table struct {
-		Name       string // Table name.
-		SchemaName string // Schema name.
+// Table
+type Table struct {
+	Name       string // Table name.
+	SchemaName string // Schema name.
 
-		gari           *Gari              // Pointer to gari config.
-		columns        []*column          // Slice of pointer to columns.
-		columnMap      map[string]*column // Map of columns.
-		pkey           *column            // Pointer to PRIMARY KEY column.
-		insertExecutor *insertExecutor    // Executor to execute INSERT SQL.
-		updateExecutor *updateExecutor    // Executor to execute UPDATE SQL.
-		deleteExecutor *deleteExecutor    // Executor to execute DELETE SQL.
+	gari           *Gari              // Pointer to gari config.
+	columns        []*column          // Slice of pointer to columns.
+	columnMap      map[string]*column // Map of columns.
+	pkey           *column            // Pointer to PRIMARY KEY column.
+	mapper         Mapper             // Mapper of column and field name.
+	insertExecutor *insertExecutor    // Executor to execute INSERT SQL.
+	updateExecutor *updateExecutor    // Executor to execute UPDATE SQL.
+	deleteExecutor *deleteExecutor    // Executor to execute DELETE SQL.
 
-		beforeInsertHooks []HookFunc
-		afterInsertHooks  []HookFunc
-		beforeUpdateHooks []HookFunc
-		afterUpdateHooks  []HookFunc
-		beforeDeleteHooks []HookFunc
-		afterDeleteHooks  []HookFunc
-	}
-)
+	beforeInsertHooks []HookFunc
+	afterInsertHooks  []HookFunc
+	beforeUpdateHooks []HookFunc
+	afterUpdateHooks  []HookFunc
+	beforeDeleteHooks []HookFunc
+	afterDeleteHooks  []HookFunc
+}
 
 // Create new table.
 func newTable(g *Gari, name string) *Table {
@@ -35,6 +34,7 @@ func newTable(g *Gari, name string) *Table {
 		gari:      g,
 		columns:   make([]*column, 0),
 		columnMap: make(map[string]*column, 0),
+		mapper:    SnakeCamelMapper{},
 	}
 	return t
 }
@@ -43,7 +43,7 @@ func newTable(g *Gari, name string) *Table {
 func (t *Table) ColumnNames() []string {
 	names := make([]string, len(t.columns))
 	for i, col := range t.columns {
-		names[i] = col.name
+		names[i] = col.Name
 	}
 	return names
 }
@@ -52,16 +52,7 @@ func (t *Table) ColumnNames() []string {
 func (t *Table) FullColumnNames() []string {
 	names := make([]string, len(t.columns))
 	for i, col := range t.columns {
-		names[i] = fmt.Sprintf("%s.%s", t.Name, col.name)
-	}
-	return names
-}
-
-// Struct field names.
-func (t *Table) FieldNames() []string {
-	names := make([]string, len(t.columns))
-	for i, col := range t.columns {
-		names[i] = col.fieldName
+		names[i] = fmt.Sprintf("%s.%s", t.Name, col.Name)
 	}
 	return names
 }
@@ -162,11 +153,10 @@ func (t *Table) LoadTestdata(xid string) error {
 func (t *Table) addColumn(col *column) {
 	t.columns = append(t.columns, col)
 	// Add column pointer to map.
-	t.columnMap[col.name] = col
-	t.columnMap[col.fieldName] = col
+	t.columnMap[col.Name] = col
 }
 
 // Get column by column name or field name.
-func (t *Table) column(name string) *column {
+func (t *Table) columnByName(name string) *column {
 	return t.columnMap[name]
 }
