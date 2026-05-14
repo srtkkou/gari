@@ -54,7 +54,7 @@ func (e *deleteExecutor) Values(ptrs ...any) *deleteExecutor {
 		values[0] = newValueByColumn(e.table.pkey)
 		fieldName := e.gari().mapper.FieldNameOf(e.table.pkey.Name)
 		values[0].raw = m[fieldName]
-		r := newRecord(values)
+		r := newRecord(e.gari(), values)
 		e.records = append(e.records, r)
 	}
 	return e

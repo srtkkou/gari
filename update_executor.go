@@ -69,7 +69,7 @@ func (e *updateExecutor) Values(ptrs ...any) *updateExecutor {
 			fieldName := e.gari().mapper.FieldNameOf(col.Name)
 			values[i].raw = m[fieldName]
 		}
-		r := newRecord(values)
+		r := newRecord(e.gari(), values)
 		e.records = append(e.records, r)
 	}
 	return e

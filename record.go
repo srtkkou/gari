@@ -10,13 +10,15 @@ import (
 type (
 	// Data record.
 	Record struct {
+		gari   *Gari             // Pointer to Gari
 		values []*value          // Slice of values.
 		m      map[string]*value // Map of values.
 	}
 )
 
-func newRecord(values []*value) *Record {
+func newRecord(g *Gari, values []*value) *Record {
 	r := &Record{
+		gari:   g,
 		values: values,
 		m:      make(map[string]*value, 0),
 	}
