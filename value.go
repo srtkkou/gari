@@ -112,3 +112,29 @@ func (v *value) Scan(value any) (err error) {
 func (v *value) arg() any {
 	return v.raw
 }
+
+func (v *value) AsNullInt64() sql.NullInt64 {
+	switch tv := v.raw.(type) {
+	case int64:
+		return sql.NullInt64{Valid: true, Int64: tv}
+	case int32:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	case int16:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	case int8:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	case int:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	default:
+		return sql.NullInt64{Valid: false}
+	}
+}
+
+func (v *value) AsNullString() sql.NullString {
+	switch tv := v.raw.(type) {
+	case string:
+		return sql.NullString{Valid: true, String: tv}
+	default:
+		return sql.NullString{Valid: false}
+	}
+}

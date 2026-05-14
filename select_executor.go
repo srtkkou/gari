@@ -18,10 +18,11 @@ type selectExecutor struct {
 }
 
 var (
-	ErrSelectExec        = errors.New("gari.ErrSelectExec")
-	ErrSelectScan        = errors.New("gari.ErrSelectScan")
-	ErrSelectRows        = errors.New("gari.ErrSelectRows")
-	ErrSelectColumnTypes = errors.New("gari.ErrSelectColumnTypes")
+	ErrSelectExec         = errors.New("gari.ErrSelectExec")
+	ErrSelectScan         = errors.New("gari.ErrSelectScan")
+	ErrSelectAppendStruct = errors.New("gari.ErrSelectAppendStruct")
+	ErrSelectRows         = errors.New("gari.ErrSelectRows")
+	ErrSelectColumnTypes  = errors.New("gari.ErrSelectColumnTypes")
 )
 
 // Create new selectExecutor.
@@ -74,6 +75,10 @@ func (e *selectExecutor) Exec(
 		values[i] = v
 		args[i] = v
 	}
+	// TODO: Create slice.
+	if e.ptr == nil {
+		makeSlice(e.ptr)
+	}
 	// Scan rows.
 	count := 0
 	for rows.Next() {
@@ -87,9 +92,16 @@ func (e *selectExecutor) Exec(
 			e.gari.errorLog(err.Error())
 			return err
 		}
-		// Pass Record to func.
-		r := newRecord(values)
-		fn(r)
+		// Copy record to new struct.
+		r := newRecord(e.gari, values)
+		err = appendStructFromRecord(e.ptr, r)
+		if err != nil {
+			err = errs.Wrap(ErrSelectAppendStruct,
+				errs.WithCause(err),
+				errs.WithContext("query", e.query))
+			e.gari.errorLog(err.Error())
+			return err
+		}
 	}
 	// Check error
 	if rows.Err() != nil {
