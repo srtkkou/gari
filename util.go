@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	reUpper    = regexp.MustCompile(`[A-Z]`)
-	reUnderbar = regexp.MustCompile(`_(.)`)
+	reUpper      = regexp.MustCompile(`[A-Z]`)
+	reUnderbar   = regexp.MustCompile(`_(.)`)
+	reMultiSpace = regexp.MustCompile(`\s{2,}`)
 )
 
 // Convert snake-case string to lower camel-case.
@@ -36,4 +37,8 @@ func upperCamelToSnakeCase(input string) string {
 		return str[1:]
 	}
 	return str
+}
+
+func squashSpace(input string) string {
+	return reMultiSpace.ReplaceAllString(input, " ")
 }
