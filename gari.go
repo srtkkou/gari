@@ -11,29 +11,28 @@ import (
 	"github.com/goark/errs"
 )
 
-type (
-	// Gari configuration.
-	Gari struct {
-		Logger *slog.Logger                  // Default logger.
-		Debug  func(msg string, args ...any) // Debug level log func.
-		Info   func(msg string, args ...any) // Info level log func.
-		Warn   func(msg string, args ...any) // Warn level log func.
-		Error  func(msg string, args ...any) // Error level log func.
+// Gari configuration.
+type Gari struct {
+	Logger *slog.Logger                  // Default logger.
+	Debug  func(msg string, args ...any) // Debug level log func.
+	Info   func(msg string, args ...any) // Info level log func.
+	Warn   func(msg string, args ...any) // Warn level log func.
+	Error  func(msg string, args ...any) // Error level log func.
 
-		db          *sql.DB // Pointer to database pool.
-		isClosed    bool    // Flag to see if db is closed.
-		dialect     Dialect // Dialects of DB.
-		stringQuote string  // Quotation of strings.
-		idQuote     string  // Quotation of identifiers.
+	db          *sql.DB // Pointer to database pool.
+	isClosed    bool    // Flag to see if db is closed.
+	dialect     Dialect // Dialects of DB.
+	stringQuote string  // Quotation of strings.
+	idQuote     string  // Quotation of identifiers.
 
-		tables   []*Table          // Slice of table ptrs.
-		tableMap map[string]*Table // Map of table ptrs.
+	tables   []*Table          // Slice of table ptrs.
+	tableMap map[string]*Table // Map of table ptrs.
 
-		txBuilder *txBuilder // Pointer to txBuilder.
-	}
-	// Option func.
-	OptionFunc func(*Gari) error
-)
+	txBuilder *txBuilder // Pointer to txBuilder.
+}
+
+// Option func.
+type OptionFunc func(*Gari) error
 
 var (
 	ErrOption          = errors.New("gari.ErrOption")
@@ -114,8 +113,8 @@ func (g *Gari) TableWithSchema(
 }
 
 // Execute SELECT SQL statement.
-func (g *Gari) Select(query string) *selectExecutor {
-	return newSelectExecutor(g, query)
+func (g *Gari) Select(ptr any, query string) *selectExecutor {
+	return newSelectExecutor(g, ptr, query)
 }
 
 // Begin transaction.

@@ -4,20 +4,18 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/goark/errs"
 )
 
-type (
-	// Executor to run raw SELECT SQL.
-	selectExecutor struct {
-		gari  *Gari
-		query string
-		err   error // Error.
-	}
-)
+// Executor to run raw SELECT SQL.
+type selectExecutor struct {
+	gari  *Gari
+	ptr   any
+	query string
+	err   error // Error.
+}
 
 var (
 	ErrSelectExec        = errors.New("gari.ErrSelectExec")
@@ -27,12 +25,13 @@ var (
 )
 
 // Create new selectExecutor.
-func newSelectExecutor(g *Gari, query string) *selectExecutor {
-	query = strings.ReplaceAll(query, "\t", "")
-	query = strings.ReplaceAll(query, "\n", "")
+func newSelectExecutor(
+	g *Gari, ptr any, query string,
+) *selectExecutor {
 	e := selectExecutor{
 		gari:  g,
-		query: query,
+		ptr:   ptr,
+		query: squashSpace(query),
 	}
 	return &e
 }
