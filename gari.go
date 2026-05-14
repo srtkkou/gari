@@ -19,11 +19,10 @@ type Gari struct {
 	Warn   func(msg string, args ...any) // Warn level log func.
 	Error  func(msg string, args ...any) // Error level log func.
 
-	db          *sql.DB // Pointer to database pool.
-	isClosed    bool    // Flag to see if db is closed.
-	dialect     Dialect // Dialects of DB.
-	stringQuote string  // Quotation of strings.
-	idQuote     string  // Quotation of identifiers.
+	db       *sql.DB // Pointer to database pool.
+	isClosed bool    // Flag to see if db is closed.
+	dialect  Dialect // Dialects of DB.
+	mapper   Mapper  // Mapper of column and field name.
 
 	tables   []*Table          // Slice of table ptrs.
 	tableMap map[string]*Table // Map of table ptrs.
@@ -46,13 +45,12 @@ var (
 // Open DB connection.
 func Open(db *sql.DB, dialect Dialect, fns ...OptionFunc) (*Gari, error) {
 	g := &Gari{
-		db:          db,
-		isClosed:    false,
-		dialect:     dialect,
-		stringQuote: `'`,
-		idQuote:     `"`,
-		tables:      make([]*Table, 0),
-		tableMap:    make(map[string]*Table, 0),
+		db:       db,
+		isClosed: false,
+		dialect:  dialect,
+		mapper:   SnakeCamelMapper{},
+		tables:   make([]*Table, 0),
+		tableMap: make(map[string]*Table, 0),
 	}
 	// Setup logger.
 	logOpts := slog.HandlerOptions{Level: slog.LevelDebug}

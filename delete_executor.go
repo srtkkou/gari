@@ -52,7 +52,7 @@ func (e *deleteExecutor) Values(ptrs ...any) *deleteExecutor {
 		// Build record.
 		values := make([]*value, 1)
 		values[0] = newValueByColumn(e.table.pkey)
-		fieldName := e.table.mapper.FieldNameOf(e.table.pkey.Name)
+		fieldName := e.gari().mapper.FieldNameOf(e.table.pkey.Name)
 		values[0].raw = m[fieldName]
 		r := newRecord(values)
 		e.records = append(e.records, r)

@@ -10,14 +10,14 @@ type Table struct {
 	Name       string // Table name.
 	SchemaName string // Schema name.
 
-	gari           *Gari              // Pointer to gari config.
-	columns        []*column          // Slice of pointer to columns.
-	columnMap      map[string]*column // Map of columns.
-	pkey           *column            // Pointer to PRIMARY KEY column.
-	mapper         Mapper             // Mapper of column and field name.
-	insertExecutor *insertExecutor    // Executor to execute INSERT SQL.
-	updateExecutor *updateExecutor    // Executor to execute UPDATE SQL.
-	deleteExecutor *deleteExecutor    // Executor to execute DELETE SQL.
+	gari      *Gari              // Pointer to gari config.
+	columns   []*column          // Slice of pointer to columns.
+	columnMap map[string]*column // Map of columns.
+	pkey      *column            // Pointer to PRIMARY KEY column.
+
+	insertExecutor *insertExecutor // Executor to execute INSERT SQL.
+	updateExecutor *updateExecutor // Executor to execute UPDATE SQL.
+	deleteExecutor *deleteExecutor // Executor to execute DELETE SQL.
 
 	beforeInsertHooks []HookFunc
 	afterInsertHooks  []HookFunc
@@ -34,7 +34,6 @@ func newTable(g *Gari, name string) *Table {
 		gari:      g,
 		columns:   make([]*column, 0),
 		columnMap: make(map[string]*column, 0),
-		mapper:    SnakeCamelMapper{},
 	}
 	return t
 }

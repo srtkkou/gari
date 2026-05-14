@@ -66,7 +66,7 @@ func (e *updateExecutor) Values(ptrs ...any) *updateExecutor {
 		values := make([]*value, len(columns))
 		for i, col := range columns {
 			values[i] = newValueByColumn(col)
-			fieldName := e.table.mapper.FieldNameOf(col.Name)
+			fieldName := e.gari().mapper.FieldNameOf(col.Name)
 			values[i].raw = m[fieldName]
 		}
 		r := newRecord(values)
