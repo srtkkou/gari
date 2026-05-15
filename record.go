@@ -10,19 +10,20 @@ import (
 type (
 	// Data record.
 	Record struct {
+		gari   *Gari             // Pointer to Gari
 		values []*value          // Slice of values.
 		m      map[string]*value // Map of values.
 	}
 )
 
-func newRecord(values []*value) *Record {
+func newRecord(g *Gari, values []*value) *Record {
 	r := &Record{
+		gari:   g,
 		values: values,
 		m:      make(map[string]*value, 0),
 	}
 	for _, value := range values {
 		r.m[value.columnName] = value
-		r.m[value.fieldName] = value
 	}
 	return r
 }
@@ -45,14 +46,6 @@ func (r *Record) ColumnNames() []string {
 	names := make([]string, len(r.values))
 	for i, value := range r.values {
 		names[i] = value.columnName
-	}
-	return names
-}
-
-func (r *Record) FieldNames() []string {
-	names := make([]string, len(r.values))
-	for i, value := range r.values {
-		names[i] = value.fieldName
 	}
 	return names
 }

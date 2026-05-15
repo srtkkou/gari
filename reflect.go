@@ -2,6 +2,7 @@ package gari
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/goark/errs"
@@ -94,22 +95,20 @@ func makeSlice(ptr any) error {
 	return nil
 }
 
-func newStruct(ptr any) (any, error) {
+func appendStructFromRecord(ptr any, r *Record) error {
 	// Check if argument ptr is a pointer type.
 	ptrV := reflect.ValueOf(ptr)
 	ptrVKind := ptrV.Kind()
 	if ptrVKind != reflect.Pointer {
-		err := errs.Wrap(ErrReflectNotPointer,
+		return errs.Wrap(ErrReflectNotPointer,
 			errs.WithContext("kind", ptrVKind))
-		return nil, err
 	}
 	// Check if argument is a pointer to slice.
 	sliceV := ptrV.Elem()
 	sliceVKind := sliceV.Kind()
 	if sliceVKind != reflect.Slice {
-		err := errs.Wrap(ErrReflectNotSlice,
+		return errs.Wrap(ErrReflectNotSlice,
 			errs.WithContext("kind", sliceVKind))
-		return nil, err
 	}
 	// Get slice element type.
 	var structType reflect.Type
@@ -126,52 +125,43 @@ func newStruct(ptr any) (any, error) {
 		}
 	}
 	if structType == nil {
-		err := errs.Wrap(ErrReflectNotStruct,
+		return errs.Wrap(ErrReflectNotStruct,
 			errs.WithContext("type", elementVType))
-		return nil, err
 	}
 	// Build new struct.
-	newV := reflect.New(structType)
-	return newV.Interface(), nil
-}
-
-func eachField(ptr any, fn func(name string, ptr any)) error {
-	structV, err := structPtrToV(ptr)
-	if err != nil {
-		return err
-	}
-	// Iterate over struct fields.
+	structPtrV := reflect.New(structType)
+	structV := structPtrV.Elem()
+	// Set field values.
 	for structField, fieldV := range structV.Fields() {
-		name := structField.Name
-		valuePtr := fieldV.Addr()
-		fn(name, valuePtr.Interface())
+		fieldName := structField.Name
+		colName := r.gari.mapper.ColumnNameOf(fieldName)
+		value, ok := r.valueByName(colName)
+		if !ok {
+			continue
+		}
+		switch tv := value.raw.(type) {
+		case int:
+			fieldV.SetInt(int64(tv))
+		case int8:
+			fieldV.SetInt(int64(tv))
+		case int16:
+			fieldV.SetInt(int64(tv))
+		case int32:
+			fieldV.SetInt(int64(tv))
+		case int64:
+			fieldV.SetInt(tv)
+		case string:
+			fieldV.SetString(tv)
+		default:
+			rawV := reflect.ValueOf(tv)
+			fieldPtrV := fieldV.Addr()
+			fieldPtrV.Set(rawV.Addr())
+		}
+		fmt.Printf("==fieldName=%s, colName=%s, value=%v(%T)\n",
+			fieldName, colName, value, value)
 	}
-	return nil
-}
-
-func appendToSlice(slicePtr any, itemPtr any) error {
-	// Check if argument ptr is a pointer type.
-	slicePtrV := reflect.ValueOf(slicePtr)
-	ptrVKind := slicePtrV.Kind()
-	if ptrVKind != reflect.Pointer {
-		return errs.Wrap(ErrReflectNotPointer,
-			errs.WithContext("kind", ptrVKind))
-	}
-	// Check if argument is a pointer to slice.
-	sliceV := slicePtrV.Elem()
-	sliceVKind := sliceV.Kind()
-	if sliceVKind != reflect.Slice {
-		return errs.Wrap(ErrReflectNotSlice,
-			errs.WithContext("kind", sliceVKind))
-	}
-	// Do nothing if slice is not nil.
-	if sliceV.IsNil() {
-		return ErrReflectNilSlice
-	}
-	// Append item to slice.
-	itemPtrV := reflect.ValueOf(itemPtr)
-	itemV := itemPtrV.Elem()
-	newSliceV := reflect.Append(sliceV, itemV)
-	sliceV.Set(newSliceV)
+	fmt.Printf("-----STRUCT=%v\n", structPtrV.Interface())
+	// Append struct to slice.
+	sliceV.Set(reflect.Append(sliceV, structPtrV))
 	return nil
 }

@@ -62,8 +62,6 @@ func TestSqlite(t *testing.T) {
 	require.NoError(t, err)
 	// SELECT.
 	var results []testModel
-	//	results := make([]testModel, 0)
-	//result := testModel{}
 	err = g.Select(&results,
 		`SELECT "id", "created_at", "updated_at", "deleted_at",
 		"num", "text" FROM "test_models" ORDER BY "id" ASC;`,

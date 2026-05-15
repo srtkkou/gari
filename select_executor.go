@@ -3,7 +3,6 @@ package gari
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -19,11 +18,11 @@ type selectExecutor struct {
 }
 
 var (
-	ErrSelectExec        = errors.New("gari.ErrSelectExec")
-	ErrSelectScan        = errors.New("gari.ErrSelectScan")
-	ErrSelectStructNew   = errors.New("gari.ErrSelectStructNew")
-	ErrSelectRows        = errors.New("gari.ErrSelectRows")
-	ErrSelectColumnTypes = errors.New("gari.ErrSelectColumnTypes")
+	ErrSelectExec         = errors.New("gari.ErrSelectExec")
+	ErrSelectScan         = errors.New("gari.ErrSelectScan")
+	ErrSelectAppendStruct = errors.New("gari.ErrSelectAppendStruct")
+	ErrSelectRows         = errors.New("gari.ErrSelectRows")
+	ErrSelectColumnTypes  = errors.New("gari.ErrSelectColumnTypes")
 )
 
 // Create new selectExecutor.
@@ -93,30 +92,16 @@ func (e *selectExecutor) Exec(
 			e.gari.errorLog(err.Error())
 			return err
 		}
-		// Build struct to store values.
-		itemPtr, err := newStruct(e.ptr)
+		// Copy record to new struct.
+		r := newRecord(e.gari, values)
+		err = appendStructFromRecord(e.ptr, r)
 		if err != nil {
-			err = errs.Wrap(ErrSelectStructNew,
+			err = errs.Wrap(ErrSelectAppendStruct,
 				errs.WithCause(err),
 				errs.WithContext("query", e.query))
 			e.gari.errorLog(err.Error())
 			return err
 		}
-		fmt.Printf("NewStruct=%v(%T)\n", itemPtr, itemPtr)
-		// Copy values into struct.
-		r := newRecord(values)
-		//lint:ignore SA4009 Overwrite ptr is needed.
-		eachField(itemPtr, func(name string, ptr any) {
-			colName := e.gari.mapper.ColumnNameOf(name)
-			value, ok := r.valueByName(colName)
-			if ok {
-				ptr = &value.raw
-				fmt.Printf("name=%s colName=%s ptr=%v(%T) Value=%s\n", name, colName, ptr, ptr, value)
-			}
-		})
-		// Append to slice.
-		appendToSlice(e.ptr, itemPtr)
-		//		fn(r)
 	}
 	// Check error
 	if rows.Err() != nil {

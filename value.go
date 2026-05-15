@@ -12,7 +12,6 @@ import (
 type value struct {
 	tableName  string // Table name.
 	columnName string // Column name.
-	fieldName  string // Golang struct field name.
 	kind       kind   // Kind.
 	dbType     string // DB type name.
 	length     int64  // Length of DB column.
@@ -52,7 +51,6 @@ func newValueByColumnType(t *sql.ColumnType) *value {
 		v.tableName = tokens[0]
 		v.columnName = tokens[len(tokens)-1]
 	}
-	v.fieldName = snakeToUpperCamelCase(v.columnName)
 	v.dbType = t.DatabaseTypeName()
 	switch strings.ToUpper(v.dbType) {
 	case "VARCHAR", "TEXT":
@@ -85,8 +83,6 @@ func (v *value) String() string {
 	sb.WriteString(strconv.Quote(v.tableName))
 	sb.WriteString(`,"columnName":`)
 	sb.WriteString(strconv.Quote(v.columnName))
-	sb.WriteString(`,"fieldName":`)
-	sb.WriteString(strconv.Quote(v.fieldName))
 	sb.WriteString(`,"kind":`)
 	sb.WriteString(strconv.Quote(v.kind))
 	sb.WriteString(`,"dbType":`)
@@ -115,4 +111,30 @@ func (v *value) Scan(value any) (err error) {
 // Convert to SQL argument value.
 func (v *value) arg() any {
 	return v.raw
+}
+
+func (v *value) AsNullInt64() sql.NullInt64 {
+	switch tv := v.raw.(type) {
+	case int64:
+		return sql.NullInt64{Valid: true, Int64: tv}
+	case int32:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	case int16:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	case int8:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	case int:
+		return sql.NullInt64{Valid: true, Int64: int64(tv)}
+	default:
+		return sql.NullInt64{Valid: false}
+	}
+}
+
+func (v *value) AsNullString() sql.NullString {
+	switch tv := v.raw.(type) {
+	case string:
+		return sql.NullString{Valid: true, String: tv}
+	default:
+		return sql.NullString{Valid: false}
+	}
 }
